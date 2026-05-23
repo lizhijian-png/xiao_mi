@@ -92,9 +92,9 @@ def _lateral_correction(y):
     """
     offset = y - PATH_CENTER_Y
     if offset > LATERAL_TOLERANCE:
-        return 7   # 偏左（y>0）→ 向右平移校正
+        return 30  # 偏左（y>0）→ 前进+右纠偏
     if offset < -LATERAL_TOLERANCE:
-        return 8   # 偏右（y<0）→ 向左平移校正
+        return 29  # 偏右（y<0）→ 前进+左纠偏
     return 0
 
 
@@ -185,9 +185,9 @@ def segment1_control(position, gait_mode, rpy, frame=None):
         if frame is not None:
             px_offset = detect_yellow_line_offset(frame)
             if px_offset > 40:
-                return 8   # 偏右 → 向右平移校正
+                return 7   # 偏右 → 左平移校正
             if px_offset < -40:
-                return 7   # 偏左 → 向左平移校正
+                return 8   # 偏左 → 右平移校正
         else:
             # 无视觉时靠位置纠偏（基准为首次捕获的 y）
             corr = _lateral_correction(y - _path_center_y + PATH_CENTER_Y)

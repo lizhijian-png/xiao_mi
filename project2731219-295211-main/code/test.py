@@ -12,12 +12,19 @@ import threading
 import os
 import numpy as np
 import cv2
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 from Robot_Ctrl import Robot_Ctrl
 from Msg_receive import Pos_msg, Gait_msg
 from user_pub import user_pub
 from robot_control_cmd_lcmt import robot_control_cmd_lcmt
 from identify import arrow,yellow_wait,yellow_light
 from segment1 import segment1_control, reset_segment1
+from segment2 import segment2_control, reset_segment2
+from segment3 import segment3_control, reset_segment3
 flags ={
     "ENDING_FLAG1" : False,# 赛段1标志
     "ENDING_FLAG2" : False,# 赛段2标志
@@ -62,7 +69,7 @@ results = {
 }
 
 # 根据位置和标志决定狗子执行的动作
-def select_step_based_on_position(position,gait_mode,rpy):
+def select_step_based_on_position(position, gait_mode, rpy, frame=None):
     global flags,results
     x, y, z = position
     gait, mode = gait_mode
@@ -78,10 +85,27 @@ def select_step_based_on_position(position,gait_mode,rpy):
                 return 1  # 赛段1完成时机器人朝向已为90°，直接前进进入赛段2
             return step
 
-        # 进入S弯
-        elif y< 5.47 and flags["ENDING_FLAG3"] == False:
-            flags["ENDING_FLAG2"] = True
-            return pass_s_and_identify_arrow(position,rpy)
+        # 赛段2：荒野寻珠
+        elif flags["ENDING_FLAG2"] == False:
+            step = segment2_control(position, gait_mode, rpy, frame=frame)
+            if step == -1:
+                flags["ENDING_FLAG2"] = True
+                return walk_90(rpy)  # 进入第三赛段（S弯）
+            return step
+
+        # 赛段3：S型弯道
+        elif flags["ENDING_FLAG3"] == False:
+            step = segment3_control(position, gait_mode, rpy)
+            if step == -1:
+                flags["ENDING_FLAG3"] = True
+            return step if step != -1 else walk_90(rpy)
+
+        # 赛段3出口：朝 90° 前进到 y >= 7.0
+        elif flags["ENDING_FLAG4"] == False:
+            if y >= 7.0:
+                flags["ENDING_FLAG4"] = True
+                return 0
+            return walk_90(rpy)
 
         # 进入S弯回程
         elif (y>0.5 or (x>1.2 and y>0.1)) and flags["ENDING_FLAG7"] == False:
@@ -414,6 +438,22 @@ def pass_s_back(position,rpy):
 
 
 ###########################################################################################
+class CameraNode(Node):
+    def __init__(self):
+        super().__init__("test_camera")
+        self.bridge = CvBridge()
+        self.frame = None
+        qos = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1,
+        )
+        self.create_subscription(Image, "/rgb_camera/image_raw", self._cb, qos)
+
+    def _cb(self, msg):
+        self.frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+
+
 def main():
     global turn_count
     turn_count = 0
@@ -424,13 +464,19 @@ def main():
     try:
         user_pub()
         reset_segment1()
+        reset_segment2()
+        reset_segment3()
         my_ctrl = Robot_Ctrl()
         pos_msg = Pos_msg(data_lock)
-        gait_msg = Gait_msg(data_lock)        
+        gait_msg = Gait_msg(data_lock)
         ctrl_thread = threading.Thread(target=my_ctrl.run)
         rec_thread = threading.Thread(target=pos_msg.run)
         gait_thread= threading.Thread(target=gait_msg.run)
-            
+
+        rclpy.init(args=None)
+        cam_node = CameraNode()
+        ros_thread = threading.Thread(target=lambda: rclpy.spin(cam_node), daemon=True)
+
         ctrl_thread.start()
         time.sleep(4)
         my_ctrl.num = 2# 起步左转一下调正机位
@@ -438,18 +484,20 @@ def main():
         time.sleep(0.5)
         rec_thread.start()
         gait_thread.start()
+        ros_thread.start()
         def print_worker():
             while True:
-                print(f"当前位置: {pos_msg.position} 机身朝向{pos_msg.rpy[2]} 箭头识别结果{results['ARROW']} 选择:{my_ctrl.num}")
+                from segment2 import _state as seg2_state, _target_idx as seg2_row
+                print(f"当前位置: {pos_msg.position} 机身朝向{pos_msg.rpy[2]} 箭头识别结果{results['ARROW']} 选择:{my_ctrl.num} seg2={seg2_state}/row{seg2_row}")
                 print(f"{gait_msg.gait_mode}")
-                time.sleep(0.2) 
+                time.sleep(0.2)
         thread = threading.Thread(target=print_worker)
         thread.start()
 
         while True:
             # time.sleep(0.2)
             with data_lock:
-                num = select_step_based_on_position(pos_msg.position,gait_msg.gait_mode,pos_msg.rpy[2])
+                num = select_step_based_on_position(pos_msg.position, gait_msg.gait_mode, pos_msg.rpy[2], cam_node.frame)
                 # print(f"当前位置: {pos_msg.position} 机身朝向{pos_msg.rpy[2]} 箭头识别结果{results['ARROW']} 选择:{num}")
                 # print(f"{gait_msg.gait_mode}")
             my_ctrl.num = num

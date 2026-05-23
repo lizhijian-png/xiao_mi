@@ -448,7 +448,7 @@ duration = 0
 
 #28
 [[step]]
-mode = 11   
+mode = 11
 gait_id = 27
 contact = 15
 life_count = 0 #Fake value
@@ -460,4 +460,36 @@ ctrl_point = [ 0.0, 0.0, 0.0,]
 foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
 step_height = [ 0.02, 0.02,]
 value = 0
-duration = 0  
+duration = 0
+
+#29
+[[step]]
+mode = 11
+gait_id = 27
+contact = 15
+life_count = 0 #Fake value
+vel_des = [ 0.15, 0.05, 0.0,]     #前进+左纠偏（石板路）
+rpy_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.0,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.12, 0.12,]
+value = 0
+duration = 0
+
+#30
+[[step]]
+mode = 11
+gait_id = 27
+contact = 15
+life_count = 0 #Fake value
+vel_des = [ 0.15, -0.05, 0.0,]     #前进+右纠偏（石板路）
+rpy_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.0,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.12, 0.12,]
+value = 0
+duration = 0

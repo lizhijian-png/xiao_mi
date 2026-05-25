@@ -16,8 +16,9 @@
   rpy[2]=0°→x+, 90°→y+, 180°→x-, 270°→y-
 
 usergait.toml 步态索引：
-  0:站立 1:前进 2:左转 3:右转 4:趴下
+  0:站立 1:前进 2:左转 3:右转 4:趴下 7:左平移 8:右平移
   9:高抬腿(step_h=0.12) 10:斜坡(vel=0.25) 14:快左转 15:快右转 28:快前进
+  29:前进+左纠偏(step_h=0.12) 30:前进+右纠偏(step_h=0.12)
 """
 
 import math
@@ -40,6 +41,9 @@ HDG_YN = 270   # y- 方向
 FAST_DEG = 20
 SLOW_DEG = 8
 
+# ── 横向纠偏 ──────────────────────────────────────────────────────
+LAT_TOLERANCE = 0.03   # 3cm 容忍范围（路宽50cm，机身约50cm，余量极小）
+
 # ── 状态机 ────────────────────────────────────────────────────────
 _ST_SEG1      = "SEG1"
 _ST_TURN1     = "TURN1"
@@ -54,29 +58,21 @@ _ST_SEG5_JUMP = "SEG5_JUMP"
 _ST_DONE      = "DONE"
 
 _state = _ST_SEG1
-_entry_pos = None  # [x, y]，每个子分段的入口坐标
+_entry_pos = None  # [x, y]，每个子分段的入口坐标（即路径中心线起点）
+_center = None     # [x, y]，当前子分段的路径中心线参考点
 
 
 def reset_segment5():
-    global _state, _entry_pos
+    global _state, _entry_pos, _center
     _state = _ST_SEG1
     _entry_pos = None
+    _center = None
 
 
 def _norm(a):
     while a > 180: a -= 360
     while a <= -180: a += 360
     return a
-
-
-def _forward_at_heading(rpy, target_hdg, gait_idx):
-    """转向对准目标朝向，对准后返回指定前进步态"""
-    d = _norm(rpy - (target_hdg % 360))
-    if d > FAST_DEG:      return 15  # 快右转
-    elif d > SLOW_DEG:    return 3   # 慢右转
-    elif d < -FAST_DEG:   return 14  # 快左转
-    elif d < -SLOW_DEG:   return 2   # 慢左转
-    return gait_idx
 
 
 def _dist_along(position, direction):
@@ -93,6 +89,74 @@ def _dist_along(position, direction):
     return 0.0
 
 
+def _uneven_forward(position, rpy, target_hdg, center):
+    """
+    不平整路面前进控制：朝向对准 + 横向纠偏。
+
+    在不平整路面（宽50cm，左右高差10cm）上，先保证朝向正确，
+    再根据机身坐标系下的横向偏移选用带纠偏的组合步态。
+
+    Args:
+        position:   [x, y, z]
+        rpy:        机身朝向角（度）
+        target_hdg: 目标朝向角（度）
+        center:     [cx, cy] 路径中心线参考点
+
+    Returns:
+        int: 步态索引
+    """
+    # 1. 朝向对准
+    d = _norm(rpy - (target_hdg % 360))
+    if d > FAST_DEG:      return 15  # 快右转
+    elif d > SLOW_DEG:    return 3   # 慢右转
+    elif d < -FAST_DEG:   return 14  # 快左转
+    elif d < -SLOW_DEG:   return 2   # 慢左转
+
+    # 2. 朝向已对准，检查横向偏移
+    ox = position[0] - center[0]
+    oy = position[1] - center[1]
+
+    # 机身右方向量在世界坐标系下的投影
+    # right = rotate(heading, -90°) = (sin(hdg), -cos(hdg))
+    hdg_rad = math.radians(target_hdg)
+    rx = math.sin(hdg_rad)
+    ry = -math.cos(hdg_rad)
+
+    # 偏移向量在右方向上的投影：正值=偏右，负值=偏左
+    lateral = ox * rx + oy * ry
+
+    if lateral > LAT_TOLERANCE:
+        return 29   # 偏右 → 前进+左纠偏 (step_h=0.12)
+    elif lateral < -LAT_TOLERANCE:
+        return 30   # 偏左 → 前进+右纠偏 (step_h=0.12)
+
+    # 3. 朝向对准且位置居中 → 高抬腿直行
+    return 9
+
+
+def _forward_at_heading(rpy, target_hdg, gait_idx):
+    """转向对准目标朝向，对准后返回指定前进步态（无横向纠偏，用于平整路面）"""
+    d = _norm(rpy - (target_hdg % 360))
+    if d > FAST_DEG:      return 15
+    elif d > SLOW_DEG:    return 3
+    elif d < -FAST_DEG:   return 14
+    elif d < -SLOW_DEG:   return 2
+    return gait_idx
+
+
+def _turn_to(rpy, target_hdg, done_gait):
+    """
+    原地转向到目标朝向，对准后返回 done_gait 表示完成。
+    用于转弯状态，不前进，转到位即切换。
+    """
+    d = _norm(rpy - (target_hdg % 360))
+    if d > FAST_DEG:      return 15
+    elif d > SLOW_DEG:    return 3
+    elif d < -FAST_DEG:   return 14
+    elif d < -SLOW_DEG:   return 2
+    return done_gait
+
+
 def segment5_control(position, gait_mode, rpy):
     """
     第五赛段控制逻辑，每帧（0.2s）调用一次。
@@ -105,7 +169,7 @@ def segment5_control(position, gait_mode, rpy):
     Returns:
         int: 步态索引；-1 表示赛段5完成
     """
-    global _state, _entry_pos
+    global _state, _entry_pos, _center
 
     x, y, _ = position
     gait, mode = gait_mode
@@ -125,10 +189,12 @@ def segment5_control(position, gait_mode, rpy):
 
     # ── 转弯1：左转 90°→180° ──────────────────────────────────────
     elif _state == _ST_TURN1:
-        step = _forward_at_heading(rpy, HDG_XN, 9)
-        if step == 9:  # 对准后切换
+        step = _turn_to(rpy, HDG_XN, 0)  # 原地转向
+        if step == 0:  # 对准后进入分段2
             _state = _ST_SEG2
             _entry_pos = [x, y]
+            _center = [x, y]  # 路径中心线 = 入口y坐标（x-方向，y恒定）
+            return 0
         return step
 
     # ── 分段2：x- (180°) 不平整 4m ─────────────────────────────────
@@ -136,14 +202,16 @@ def segment5_control(position, gait_mode, rpy):
         if _dist_along(position, HDG_XN) >= SEG2_LENGTH:
             _state = _ST_TURN2
             return 0
-        return _forward_at_heading(rpy, HDG_XN, 9)  # 高抬腿 #9
+        return _uneven_forward(position, rpy, HDG_XN, _center)
 
     # ── 转弯2：右转 180°→90° ──────────────────────────────────────
     elif _state == _ST_TURN2:
-        step = _forward_at_heading(rpy, HDG_YP, 9)
-        if step == 9:
+        step = _turn_to(rpy, HDG_YP, 0)
+        if step == 0:
             _state = _ST_SEG3
             _entry_pos = [x, y]
+            _center = [x, y]
+            return 0
         return step
 
     # ── 分段3：y+ (90°) 不平整 4m ─────────────────────────────────
@@ -151,14 +219,16 @@ def segment5_control(position, gait_mode, rpy):
         if _dist_along(position, HDG_YP) >= SEG3_LENGTH:
             _state = _ST_TURN3
             return 0
-        return _forward_at_heading(rpy, HDG_YP, 9)
+        return _uneven_forward(position, rpy, HDG_YP, _center)
 
     # ── 转弯3：右转 90°→0° ────────────────────────────────────────
     elif _state == _ST_TURN3:
-        step = _forward_at_heading(rpy, HDG_XP, 9)
-        if step == 9:
+        step = _turn_to(rpy, HDG_XP, 0)
+        if step == 0:
             _state = _ST_SEG4
             _entry_pos = [x, y]
+            _center = [x, y]
+            return 0
         return step
 
     # ── 分段4：x+ (0°) 不平整 4m ──────────────────────────────────
@@ -166,14 +236,15 @@ def segment5_control(position, gait_mode, rpy):
         if _dist_along(position, HDG_XP) >= SEG4_LENGTH:
             _state = _ST_TURN4
             return 0
-        return _forward_at_heading(rpy, HDG_XP, 9)
+        return _uneven_forward(position, rpy, HDG_XP, _center)
 
     # ── 转弯4：右转 0°→270° ───────────────────────────────────────
     elif _state == _ST_TURN4:
-        step = _forward_at_heading(rpy, HDG_YN, 28)
+        step = _turn_to(rpy, HDG_YN, 28)
         if step == 28:
             _state = _ST_SEG5_FLAT
             _entry_pos = [x, y]
+            return step
         return step
 
     # ── 分段5：y- (270°) 平整 1.5m（虚线前）───────────────────────

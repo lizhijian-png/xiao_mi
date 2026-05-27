@@ -25,6 +25,7 @@ from identify import arrow,yellow_wait,yellow_light
 from segment1 import segment1_control, reset_segment1
 from segment2 import segment2_control, reset_segment2
 from segment3 import segment3_control, reset_segment3
+from segment4 import segment4_control, reset_segment4
 from segment5 import segment5_control, reset_segment5
 flags ={
     "ENDING_FLAG1" : False,# 赛段1标志
@@ -103,13 +104,11 @@ def select_step_based_on_position(position, gait_mode, rpy, frame=None):
 
         # 赛段3出口：朝 90° 前进，对准中心线 x=3.15 后进入赛段5
         elif flags["ENDING_FLAG4"] == False:
-            if y >= 7.0:
-                if x >= 3.13:  # 已对准中心线 3.15（留2cm容差）
-                    flags["ENDING_FLAG4"] = True
-                    return 0
-                elif 88 < rpy < 92:
-                    return 30  # 朝向正确但偏左 → 前进+右移靠拢中心线
-            return walk_90(rpy)
+            step = segment4_control(position, gait_mode, rpy, frame=frame)
+            if step == -1:
+                flags["ENDING_FLAG4"] = True
+                return 0
+            return step
 
         # 赛段5：螺旋爬坡+不平整路面+跳下
         elif flags["ENDING_FLAG5"] == False:
@@ -478,6 +477,7 @@ def main():
         reset_segment1()
         reset_segment2()
         reset_segment3()
+        reset_segment4()
         reset_segment5()
         my_ctrl = Robot_Ctrl()
         pos_msg = Pos_msg(data_lock)

@@ -1,72 +1,86 @@
 """
 第五赛段：螺旋爬坡 + 不平整路面 + 跳下
 
-赛道描述：
-  分段1：y+ (90°) 上坡 4.5m（起点高5cm→终点高20cm）
-  转弯1：左转 90°→180°
-  分段2：x- (180°) 不平整路面 4m（左高20cm/右高10cm，宽50cm）
-  转弯2：右转 180°→90°
-  分段3：y+ (90°) 不平整路面 4m
-  转弯3：右转 90°→0°
-  分段4：x+ (0°) 不平整路面 4m
-  转弯4：右转 0°→270°
-  分段5：y- (270°) 平整路面 2m（1.5m + 0.5m跳下区）
-
-坐标系（与 test.py 一致）：
-  rpy[2]=0°→x+, 90°→y+, 180°→x-, 270°→y-
+赛道几何（绝对坐标）：
+  分段1：y+ (90°)  中心线 x=3.15    起点(3.15, 7.0)  → 终点(3.15, 12.35)  长5.35m
+      ├─ 台阶在 y≈7.6
+  分段2：x- (180°) 中心线 y=12.35   起点(3.15, 12.35) → 终点(-0.35, 12.35) 长3.5m
+  分段3：y+ (90°)  中心线 x=-0.35   起点(-0.35, 12.35) → 终点(-0.35, 15.35) 长3.0m
+  分段4：x+ (0°)   中心线 y=15.35   起点(-0.35, 15.35) → 终点(3.15, 15.35)  长3.5m
+  分段5：y- (270°) 中心线 x=3.15    起点(3.15, 15.35) → 平整1.5m+跳下0.5m  长2.0m
 
 usergait.toml 步态索引：
-  0:站立 1:前进 2:左转 3:右转 4:趴下 7:左平移 8:右平移
-  9:高抬腿(step_h=0.12) 10:斜坡(vel=0.25) 14:快左转 15:快右转 28:快前进
-  29:前进+左纠偏(step_h=0.12) 30:前进+右纠偏(step_h=0.12)
+  共享（赛段1-4不变）：
+    0:站立 1:前进 2:左转 3:右转 4:趴下 9:高抬腿 10:斜坡
+    14:快左转 15:快右转 28:快前进 29:左纠偏 30:右纠偏
+  赛段5专用（已加前倾+降重心，并降低抬腿高度避免上坡绊脚）：
+    31:高抬腿(step_h=0.14,pitch=-0.08,z=-0.05) 32:斜坡(step_h=0.10,pitch=-0.05,z=-0.03)
+    33:左纠偏(step_h=0.12,pitch=-0.03,z=-0.03) 34:右纠偏(step_h=0.12,pitch=-0.03,z=-0.03)
 """
 
 import math
 
-# ── 子分段长度（米）────────────────────────────────────────────────
-SEG1_LENGTH = 4.5    # 上坡 450cm
-SEG2_LENGTH = 4.0    # 不平整 x- 400cm（外侧）
-SEG3_LENGTH = 4.0    # 不平整 y+ 400cm（外侧）
-SEG4_LENGTH = 4.0    # 不平整 x+ 400cm（外侧）
-SEG5_FLAT   = 1.5    # 平整（虚线前）150cm
-SEG5_JUMP   = 0.5    # 跳下区 50cm
+# ── 赛道几何参数（绝对坐标，米）───────────────────────────────────
+# 中心线坐标
+CENTER_X_SEG1 = 3.15    # 分段1、5 中心线 x
+CENTER_Y_SEG2 = 12.35   # 分段2 中心线 y
+CENTER_X_SEG3 = -0.35   # 分段3 中心线 x
+CENTER_Y_SEG4 = 15.35   # 分段4 中心线 y
+
+# 连接点（转弯触发位置）
+TURN1_Y = 12.35   # SEG1→SEG2: 到达 y≥12.35 触发左转
+TURN1_EARLY_Y = 12.05  # SEG1→SEG2: 提前约30cm开始弧形左转，避免到倾斜路面中心才转向
+TURN2_X = -0.35   # SEG2→SEG3: 到达 x≤-0.35 触发右转
+TURN3_Y = 15.35   # SEG3→SEG4: 到达 y≥15.35 触发右转
+TURN4_X = 3.15    # SEG4→SEG5: 到达 x≥3.15 触发右转
+SEG5_END_Y = 13.35  # SEG5 跳下区结束 (15.35 - 2.0)
+
+# 台阶位置
+STEP_Y = 7.6       # 台阶在 y=7.6
+STEP_APPROACH_Y = 7.5   # 台阶前切换到爬升步态
+
+# ── 纠偏参数 ──────────────────────────────────────────────────────
+LAT_TOLERANCE = 0.03   # 横向偏移容忍度 3cm（路宽50cm）
 
 # ── 朝向角度 ──────────────────────────────────────────────────────
-HDG_YP = 90    # y+ 方向
-HDG_XN = 180   # x- 方向
-HDG_XP = 0     # x+ 方向
-HDG_YN = 270   # y- 方向
+HDG_YP = 90    # y+
+HDG_XN = 180   # x-
+HDG_XP = 0     # x+
+HDG_YN = 270   # y-
 
 # ── 转向阈值 ──────────────────────────────────────────────────────
 FAST_DEG = 20
 SLOW_DEG = 8
-
-# ── 横向纠偏 ──────────────────────────────────────────────────────
-LAT_TOLERANCE = 0.03   # 3cm 容忍范围（路宽50cm，机身约50cm，余量极小）
+TURN1_ARC_DEG = 25      # 第一段提前弧形左转到距离目标25°内，再交给原地小角度修正
+TURN1_ARC_GAIT = 11     # 前进+左转步态，用于在第一段末端提前完成大部分转向
 
 # ── 状态机 ────────────────────────────────────────────────────────
-_ST_SEG1      = "SEG1"
-_ST_TURN1     = "TURN1"
-_ST_SEG2      = "SEG2"
-_ST_TURN2     = "TURN2"
-_ST_SEG3      = "SEG3"
-_ST_TURN3     = "TURN3"
-_ST_SEG4      = "SEG4"
-_ST_TURN4     = "TURN4"
-_ST_SEG5_FLAT = "SEG5_FLAT"
-_ST_SEG5_JUMP = "SEG5_JUMP"
-_ST_DONE      = "DONE"
+_ST_SEG1_APPROACH = "SEG1_APPROACH"
+_ST_SEG1_STEP     = "SEG1_STEP"
+_ST_SEG1_UPHILL   = "SEG1_UPHILL"
+_ST_PRE_TURN1     = "PRE_TURN1"
+_ST_TURN1         = "TURN1"
+_ST_SEG2          = "SEG2"
+_ST_PRE_TURN2     = "PRE_TURN2"
+_ST_TURN2         = "TURN2"
+_ST_SEG3          = "SEG3"
+_ST_PRE_TURN3     = "PRE_TURN3"
+_ST_TURN3         = "TURN3"
+_ST_SEG4          = "SEG4"
+_ST_PRE_TURN4     = "PRE_TURN4"
+_ST_TURN4         = "TURN4"
+_ST_SEG5_FLAT     = "SEG5_FLAT"
+_ST_SEG5_JUMP     = "SEG5_JUMP"
+_ST_DONE          = "DONE"
 
-_state = _ST_SEG1
-_entry_pos = None  # [x, y]，每个子分段的入口坐标（即路径中心线起点）
-_center = None     # [x, y]，当前子分段的路径中心线参考点
+_state = _ST_SEG1_APPROACH
+_stand_count = 0  # 站立帧计数（复用：台阶后稳定、转弯前稳定）
 
 
 def reset_segment5():
-    global _state, _entry_pos, _center
-    _state = _ST_SEG1
-    _entry_pos = None
-    _center = None
+    global _state, _stand_count
+    _state = _ST_SEG1_APPROACH
+    _stand_count = 0
 
 
 def _norm(a):
@@ -75,192 +89,235 @@ def _norm(a):
     return a
 
 
-def _dist_along(position, direction):
-    """计算从入口沿指定方向的行进距离"""
-    global _entry_pos
-    if _entry_pos is None:
-        return 0.0
-    dx = position[0] - _entry_pos[0]
-    dy = position[1] - _entry_pos[1]
-    if direction == HDG_YP:   return dy
-    elif direction == HDG_YN: return -dy
-    elif direction == HDG_XP: return dx
-    elif direction == HDG_XN: return -dx
-    return 0.0
+def _turn_step(rpy, target_hdg):
+    """纯转向：返回转向步态，对准后返回 0（站立）"""
+    d = _norm(rpy - (target_hdg % 360))
+    if d > FAST_DEG:      return 15
+    elif d > SLOW_DEG:    return 3
+    elif d < -FAST_DEG:   return 14
+    elif d < -SLOW_DEG:   return 2
+    return 0  # 对准 → 站立
 
 
-def _uneven_forward(position, rpy, target_hdg, center):
+def _forward_with_lateral(rpy, target_hdg, center_val, current_val, axis, gait_forward, gait_left, gait_right):
     """
-    不平整路面前进控制：朝向对准 + 横向纠偏。
-
-    在不平整路面（宽50cm，左右高差10cm）上，先保证朝向正确，
-    再根据机身坐标系下的横向偏移选用带纠偏的组合步态。
+    带横向纠偏的前进控制。
 
     Args:
-        position:   [x, y, z]
-        rpy:        机身朝向角（度）
-        target_hdg: 目标朝向角（度）
-        center:     [cx, cy] 路径中心线参考点
+        rpy:            当前朝向
+        target_hdg:     目标朝向
+        center_val:     中心线坐标值
+        current_val:    当前坐标值
+        axis:           'x' 或 'y'，表示横向纠偏轴
+        gait_forward:   前进步态
+        gait_left:      前进+左纠偏步态
+        gait_right:     前进+右纠偏步态
 
     Returns:
         int: 步态索引
     """
     # 1. 朝向对准
     d = _norm(rpy - (target_hdg % 360))
-    if d > FAST_DEG:      return 15  # 快右转
-    elif d > SLOW_DEG:    return 3   # 慢右转
-    elif d < -FAST_DEG:   return 14  # 快左转
-    elif d < -SLOW_DEG:   return 2   # 慢左转
+    if d > FAST_DEG:      return 15
+    elif d > SLOW_DEG:    return 3
+    elif d < -FAST_DEG:   return 14
+    elif d < -SLOW_DEG:   return 2
 
-    # 2. 朝向已对准，检查横向偏移
-    ox = position[0] - center[0]
-    oy = position[1] - center[1]
+    # 2. 横向纠偏：计算当前坐标偏离中心线的方向和大小
+    offset = current_val - center_val
 
-    # 机身右方向量在世界坐标系下的投影
-    # right = rotate(heading, -90°) = (sin(hdg), -cos(hdg))
-    hdg_rad = math.radians(target_hdg)
-    rx = math.sin(hdg_rad)
-    ry = -math.cos(hdg_rad)
-
-    # 偏移向量在右方向上的投影：正值=偏右，负值=偏左
-    lateral = ox * rx + oy * ry
+    # 将世界坐标偏移转换为机身左右方向
+    # 朝向 0°(x+)→右=y-  90°(y+)→右=x+  180°(x-)→右=y+  270°(y-)→右=x-
+    if target_hdg == HDG_XP:    # 0°,  右=y-
+        lateral = -offset
+    elif target_hdg == HDG_YP:  # 90°, 右=x+
+        lateral = offset
+    elif target_hdg == HDG_XN:  # 180°, 右=y+
+        lateral = offset
+    elif target_hdg == HDG_YN:  # 270°, 右=x-
+        lateral = -offset
+    else:
+        lateral = 0.0
 
     if lateral > LAT_TOLERANCE:
-        return 29   # 偏右 → 前进+左纠偏 (step_h=0.12)
+        return gait_left    # 偏右 → 左纠偏
     elif lateral < -LAT_TOLERANCE:
-        return 30   # 偏左 → 前进+右纠偏 (step_h=0.12)
+        return gait_right   # 偏左 → 右纠偏
 
-    # 3. 朝向对准且位置居中 → 高抬腿直行
-    return 9
-
-
-def _forward_at_heading(rpy, target_hdg, gait_idx):
-    """转向对准目标朝向，对准后返回指定前进步态（无横向纠偏，用于平整路面）"""
-    d = _norm(rpy - (target_hdg % 360))
-    if d > FAST_DEG:      return 15
-    elif d > SLOW_DEG:    return 3
-    elif d < -FAST_DEG:   return 14
-    elif d < -SLOW_DEG:   return 2
-    return gait_idx
+    return gait_forward     # 居中直行
 
 
-def _turn_to(rpy, target_hdg, done_gait):
-    """
-    原地转向到目标朝向，对准后返回 done_gait 表示完成。
-    用于转弯状态，不前进，转到位即切换。
-    """
-    d = _norm(rpy - (target_hdg % 360))
-    if d > FAST_DEG:      return 15
-    elif d > SLOW_DEG:    return 3
-    elif d < -FAST_DEG:   return 14
-    elif d < -SLOW_DEG:   return 2
-    return done_gait
+def _stand_then(next_state, required_frames):
+    """站立若干帧后切换到下一状态"""
+    global _state, _stand_count
+    _stand_count += 1
+    if _stand_count >= required_frames:
+        _state = next_state
+        _stand_count = 0
+        return 0
+    return 0  # 站立
 
 
 def segment5_control(position, gait_mode, rpy):
     """
     第五赛段控制逻辑，每帧（0.2s）调用一次。
 
-    Args:
-        position:  [x, y, z]
-        gait_mode: [gait_id, mode]
-        rpy:       float 机身朝向角（度）
-
     Returns:
         int: 步态索引；-1 表示赛段5完成
     """
-    global _state, _entry_pos, _center
+    global _state, _stand_count
 
     x, y, _ = position
     gait, mode = gait_mode
 
-    # 步态切换中等待
+    # 步态切换中等待 / 趴下后站起
     if (gait == 0 and mode == 0) or (gait == 1 and mode == 9):
         return 0
+    if mode == 7:
+        return 0
 
-    # ── 分段1：y+ (90°) 上坡 4.5m ──────────────────────────────────
-    if _state == _ST_SEG1:
-        if _entry_pos is None:
-            _entry_pos = [x, y]
-        if _dist_along(position, HDG_YP) >= SEG1_LENGTH:
-            _state = _ST_TURN1
+    # ═══════════════════════════════════════════════════════════════
+    # 分段1：y+ (90°) 中心线 x=3.15  (3.15,7.0)→(3.15,12.35)
+    # ═══════════════════════════════════════════════════════════════
+
+    # ── 接近台阶：y < 7.5 ────────────────────────────────────────
+    if _state == _ST_SEG1_APPROACH:
+        if y >= STEP_APPROACH_Y:
+            _state = _ST_SEG1_STEP
             return 0
-        return _forward_at_heading(rpy, HDG_YP, 10)  # 斜坡步态 #10
+        return _forward_with_lateral(
+            rpy, HDG_YP, CENTER_X_SEG1, x, 'x',
+            gait_forward=32, gait_left=33, gait_right=34)
 
-    # ── 转弯1：左转 90°→180° ──────────────────────────────────────
+    # ── 翻越台阶：7.5 ≤ y < 7.8 ──────────────────────────────────
+    elif _state == _ST_SEG1_STEP:
+        if y >= 7.8:
+            # 台阶翻越完成，站立稳定后进入上坡
+            step = _stand_then(_ST_SEG1_UPHILL, 3)
+            return step
+        return _forward_with_lateral(
+            rpy, HDG_YP, CENTER_X_SEG1, x, 'x',
+            gait_forward=31, gait_left=33, gait_right=34)
+
+    # ── 继续上坡：7.8 ≤ y < 12.05 ────────────────────────────────
+    elif _state == _ST_SEG1_UPHILL:
+        if y >= TURN1_EARLY_Y:
+            _state = _ST_PRE_TURN1
+            _stand_count = 0
+            return TURN1_ARC_GAIT
+        return _forward_with_lateral(
+            rpy, HDG_YP, CENTER_X_SEG1, x, 'x',
+            gait_forward=32, gait_left=33, gait_right=34)
+
+    # ── 提前弧形左转：边前进边转向，减少进入第二段倾斜路面后才转弯的风险 ─────
+    elif _state == _ST_PRE_TURN1:
+        d = _norm(rpy - (HDG_XN % 360))
+        if abs(d) <= TURN1_ARC_DEG or y >= TURN1_Y:
+            # 弧形转弯只负责提前消除大角度偏差；剩余小角度交给原地转向修正，避免转过头。
+            _state = _ST_TURN1
+            _stand_count = 0
+            return 0
+        return TURN1_ARC_GAIT
+
+    # ── 左转 90°→180°：弧形转弯后的最后小角度修正 ─────────────────────
     elif _state == _ST_TURN1:
-        step = _turn_to(rpy, HDG_XN, 0)  # 原地转向
-        if step == 0:  # 对准后进入分段2
+        step = _turn_step(rpy, HDG_XN)
+        if step == 0:
             _state = _ST_SEG2
-            _entry_pos = [x, y]
-            _center = [x, y]  # 路径中心线 = 入口y坐标（x-方向，y恒定）
             return 0
         return step
 
-    # ── 分段2：x- (180°) 不平整 4m ─────────────────────────────────
+    # ═══════════════════════════════════════════════════════════════
+    # 分段2：x- (180°) 中心线 y=12.35  (3.15,12.35)→(-0.35,12.35)
+    # ═══════════════════════════════════════════════════════════════
     elif _state == _ST_SEG2:
-        if _dist_along(position, HDG_XN) >= SEG2_LENGTH:
-            _state = _ST_TURN2
+        if x <= TURN2_X:
+            _state = _ST_PRE_TURN2
+            _stand_count = 0
             return 0
-        return _uneven_forward(position, rpy, HDG_XN, _center)
+        return _forward_with_lateral(
+            rpy, HDG_XN, CENTER_Y_SEG2, y, 'y',
+            gait_forward=31, gait_left=33, gait_right=34)
 
-    # ── 转弯2：右转 180°→90° ──────────────────────────────────────
+    # ── 转弯前稳定 ──────────────────────────────────────────────
+    elif _state == _ST_PRE_TURN2:
+        return _stand_then(_ST_TURN2, 5)
+
+    # ── 右转 180°→90° ───────────────────────────────────────────
     elif _state == _ST_TURN2:
-        step = _turn_to(rpy, HDG_YP, 0)
+        step = _turn_step(rpy, HDG_YP)
         if step == 0:
             _state = _ST_SEG3
-            _entry_pos = [x, y]
-            _center = [x, y]
             return 0
         return step
 
-    # ── 分段3：y+ (90°) 不平整 4m ─────────────────────────────────
+    # ═══════════════════════════════════════════════════════════════
+    # 分段3：y+ (90°) 中心线 x=-0.35  (-0.35,12.35)→(-0.35,15.35)
+    # ═══════════════════════════════════════════════════════════════
     elif _state == _ST_SEG3:
-        if _dist_along(position, HDG_YP) >= SEG3_LENGTH:
-            _state = _ST_TURN3
+        if y >= TURN3_Y:
+            _state = _ST_PRE_TURN3
+            _stand_count = 0
             return 0
-        return _uneven_forward(position, rpy, HDG_YP, _center)
+        return _forward_with_lateral(
+            rpy, HDG_YP, CENTER_X_SEG3, x, 'x',
+            gait_forward=31, gait_left=33, gait_right=34)
 
-    # ── 转弯3：右转 90°→0° ────────────────────────────────────────
+    # ── 转弯前稳定 ──────────────────────────────────────────────
+    elif _state == _ST_PRE_TURN3:
+        return _stand_then(_ST_TURN3, 5)
+
+    # ── 右转 90°→0° ────────────────────────────────────────────
     elif _state == _ST_TURN3:
-        step = _turn_to(rpy, HDG_XP, 0)
+        step = _turn_step(rpy, HDG_XP)
         if step == 0:
             _state = _ST_SEG4
-            _entry_pos = [x, y]
-            _center = [x, y]
             return 0
         return step
 
-    # ── 分段4：x+ (0°) 不平整 4m ──────────────────────────────────
+    # ═══════════════════════════════════════════════════════════════
+    # 分段4：x+ (0°) 中心线 y=15.35  (-0.35,15.35)→(3.15,15.35)
+    # ═══════════════════════════════════════════════════════════════
     elif _state == _ST_SEG4:
-        if _dist_along(position, HDG_XP) >= SEG4_LENGTH:
-            _state = _ST_TURN4
+        if x >= TURN4_X:
+            _state = _ST_PRE_TURN4
+            _stand_count = 0
             return 0
-        return _uneven_forward(position, rpy, HDG_XP, _center)
+        return _forward_with_lateral(
+            rpy, HDG_XP, CENTER_Y_SEG4, y, 'y',
+            gait_forward=31, gait_left=33, gait_right=34)
 
-    # ── 转弯4：右转 0°→270° ───────────────────────────────────────
+    # ── 转弯前稳定 ──────────────────────────────────────────────
+    elif _state == _ST_PRE_TURN4:
+        return _stand_then(_ST_TURN4, 5)
+
+    # ── 右转 0°→270° ───────────────────────────────────────────
     elif _state == _ST_TURN4:
-        step = _turn_to(rpy, HDG_YN, 28)
-        if step == 28:
+        step = _turn_step(rpy, HDG_YN)
+        if step == 0:
             _state = _ST_SEG5_FLAT
-            _entry_pos = [x, y]
-            return step
+            return 0
         return step
 
-    # ── 分段5：y- (270°) 平整 1.5m（虚线前）───────────────────────
+    # ═══════════════════════════════════════════════════════════════
+    # 分段5：y- (270°) 中心线 x=3.15  (3.15,15.35)→(3.15,13.35)
+    # ═══════════════════════════════════════════════════════════════
     elif _state == _ST_SEG5_FLAT:
-        if _dist_along(position, HDG_YN) >= SEG5_FLAT:
+        if y <= SEG5_END_Y + 0.5:  # 进入跳下区（最后0.5m）
             _state = _ST_SEG5_JUMP
-            _entry_pos = [x, y]
             return 0
-        return _forward_at_heading(rpy, HDG_YN, 28)  # 快速前进 #28
+        return _forward_with_lateral(
+            rpy, HDG_YN, CENTER_X_SEG1, x, 'x',
+            gait_forward=28, gait_left=33, gait_right=34)
 
-    # ── 分段5：跳下区 y- (270°) 0.5m ──────────────────────────────
+    # ── 跳下区 ──────────────────────────────────────────────────
     elif _state == _ST_SEG5_JUMP:
-        if _dist_along(position, HDG_YN) >= SEG5_JUMP:
+        if y <= SEG5_END_Y:
             _state = _ST_DONE
-            return -1  # 赛段5完成
-        return _forward_at_heading(rpy, HDG_YN, 1)  # 慢速前进 #1
+            return -1
+        return _forward_with_lateral(
+            rpy, HDG_YN, CENTER_X_SEG1, x, 'x',
+            gait_forward=1, gait_left=33, gait_right=34)
 
     return -1
 
@@ -300,7 +357,7 @@ if __name__ == "__main__":
         ctrl_thread.start()
         time.sleep(4)
 
-        my_ctrl.num = 2  # 起步微调
+        my_ctrl.num = 2
         my_ctrl.msg.life_count = (my_ctrl.msg.life_count + 1) % 127
         time.sleep(0.5)
 

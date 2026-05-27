@@ -102,7 +102,7 @@ def select_step_based_on_position(position, gait_mode, rpy, frame=None):
                 flags["ENDING_FLAG3"] = True
             return step if step != -1 else walk_90(rpy)
 
-        # 赛段3出口：朝 90° 前进到 y >= 7.0
+        # 赛段3出口：朝 90° 前进，对准中心线 x=3.15 后进入赛段5
         elif flags["ENDING_FLAG4"] == False:
             step = segment4_control(position, gait_mode, rpy, frame=frame)
             if step == -1:

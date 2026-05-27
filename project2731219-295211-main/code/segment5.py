@@ -16,6 +16,7 @@ usergait.toml 步态索引：
   赛段5专用（已加前倾+降重心，并降低抬腿高度避免上坡绊脚）：
     31:高抬腿(step_h=0.14,pitch=-0.08,z=-0.05) 32:斜坡(step_h=0.10,pitch=-0.05,z=-0.03)
     33:左纠偏(step_h=0.12,pitch=-0.03,z=-0.03) 34:右纠偏(step_h=0.12,pitch=-0.03,z=-0.03)
+    35:上台阶高抬脚(step_h=0.18,pitch=-0.08,z=-0.05)
 """
 
 import math
@@ -29,7 +30,8 @@ CENTER_Y_SEG4 = 15.35   # 分段4 中心线 y
 
 # 连接点（转弯触发位置）
 TURN1_Y = 12.35   # SEG1→SEG2: 到达 y≥12.35 触发左转
-TURN1_EARLY_Y = 12.05  # SEG1→SEG2: 提前约30cm开始弧形左转，避免到倾斜路面中心才转向
+TURN1_EARLY_Y = 12.10  # SEG1→SEG2: 在y=12.10先转45°，避免继续靠右边缘前进
+TURN1_FORWARD_DIST = 0.20  # SEG1→SEG2: 第一次45°转完后再实际前进约0.2m，再进入第二次45°转向
 TURN2_X = -0.35   # SEG2→SEG3: 到达 x≤-0.35 触发右转
 TURN3_Y = 15.35   # SEG3→SEG4: 到达 y≥15.35 触发右转
 TURN4_X = 3.15    # SEG4→SEG5: 到达 x≥3.15 触发右转
@@ -44,6 +46,7 @@ LAT_TOLERANCE = 0.03   # 横向偏移容忍度 3cm（路宽50cm）
 
 # ── 朝向角度 ──────────────────────────────────────────────────────
 HDG_YP = 90    # y+
+HDG_TURN1_MID = 135  # 第一交接处先从90°转到135°，走约0.2m后再转到180°
 HDG_XN = 180   # x-
 HDG_XP = 0     # x+
 HDG_YN = 270   # y-
@@ -51,14 +54,13 @@ HDG_YN = 270   # y-
 # ── 转向阈值 ──────────────────────────────────────────────────────
 FAST_DEG = 20
 SLOW_DEG = 8
-TURN1_ARC_DEG = 25      # 第一段提前弧形左转到距离目标25°内，再交给原地小角度修正
-TURN1_ARC_GAIT = 11     # 前进+左转步态，用于在第一段末端提前完成大部分转向
 
 # ── 状态机 ────────────────────────────────────────────────────────
 _ST_SEG1_APPROACH = "SEG1_APPROACH"
 _ST_SEG1_STEP     = "SEG1_STEP"
 _ST_SEG1_UPHILL   = "SEG1_UPHILL"
 _ST_PRE_TURN1     = "PRE_TURN1"
+_ST_TURN1_FORWARD = "TURN1_FORWARD"
 _ST_TURN1         = "TURN1"
 _ST_SEG2          = "SEG2"
 _ST_PRE_TURN2     = "PRE_TURN2"
@@ -75,12 +77,14 @@ _ST_DONE          = "DONE"
 
 _state = _ST_SEG1_APPROACH
 _stand_count = 0  # 站立帧计数（复用：台阶后稳定、转弯前稳定）
+_turn1_forward_start = None  # 第一交接处第一次45°转完后的起走位置，用于计算实际前进距离
 
 
 def reset_segment5():
-    global _state, _stand_count
+    global _state, _stand_count, _turn1_forward_start
     _state = _ST_SEG1_APPROACH
     _stand_count = 0
+    _turn1_forward_start = None
 
 
 def _norm(a):
@@ -165,7 +169,7 @@ def segment5_control(position, gait_mode, rpy):
     Returns:
         int: 步态索引；-1 表示赛段5完成
     """
-    global _state, _stand_count
+    global _state, _stand_count, _turn1_forward_start
 
     x, y, _ = position
     gait, mode = gait_mode
@@ -197,29 +201,45 @@ def segment5_control(position, gait_mode, rpy):
             return step
         return _forward_with_lateral(
             rpy, HDG_YP, CENTER_X_SEG1, x, 'x',
-            gait_forward=31, gait_left=33, gait_right=34)
+            gait_forward=35, gait_left=33, gait_right=34)
 
-    # ── 继续上坡：7.8 ≤ y < 12.05 ────────────────────────────────
+    # ── 继续上坡：7.8 ≤ y < 12.10 ────────────────────────────────
     elif _state == _ST_SEG1_UPHILL:
         if y >= TURN1_EARLY_Y:
             _state = _ST_PRE_TURN1
             _stand_count = 0
-            return TURN1_ARC_GAIT
+            return 0
         return _forward_with_lateral(
             rpy, HDG_YP, CENTER_X_SEG1, x, 'x',
             gait_forward=32, gait_left=33, gait_right=34)
 
-    # ── 提前弧形左转：边前进边转向，减少进入第二段倾斜路面后才转弯的风险 ─────
+    # ── 第一次提前转45°：先转到135°，减少第一交接处踩到右边边缘的风险 ─────
     elif _state == _ST_PRE_TURN1:
-        d = _norm(rpy - (HDG_XN % 360))
-        if abs(d) <= TURN1_ARC_DEG or y >= TURN1_Y:
-            # 弧形转弯只负责提前消除大角度偏差；剩余小角度交给原地转向修正，避免转过头。
+        step = _turn_step(rpy, HDG_TURN1_MID)
+        if step == 0:
+            # 第一次45°转向完成后，不马上转到180°，先向前走约0.2m避开右侧边缘。
+            _state = _ST_TURN1_FORWARD
+            _turn1_forward_start = (x, y)
+            return 0
+        return step
+
+    # ── 斜向前进约0.2m：按实际位移计算距离，再进入第二次45°转向 ──────────
+    elif _state == _ST_TURN1_FORWARD:
+        if _turn1_forward_start is None:
+            # 正常流程会在第一次45°转完时记录起点；这里补记一次，避免状态恢复后距离无法计算。
+            _turn1_forward_start = (x, y)
+        dx = x - _turn1_forward_start[0]
+        dy = y - _turn1_forward_start[1]
+        if math.sqrt(dx * dx + dy * dy) >= TURN1_FORWARD_DIST:
             _state = _ST_TURN1
             _stand_count = 0
+            _turn1_forward_start = None
             return 0
-        return TURN1_ARC_GAIT
+        return _forward_with_lateral(
+            rpy, HDG_TURN1_MID, CENTER_X_SEG1, x, 'x',
+            gait_forward=32, gait_left=33, gait_right=34)
 
-    # ── 左转 90°→180°：弧形转弯后的最后小角度修正 ─────────────────────
+    # ── 第二次转45°：由135°转到180°，对准第二段中心线方向 ───────────────
     elif _state == _ST_TURN1:
         step = _turn_step(rpy, HDG_XN)
         if step == 0:

@@ -101,11 +101,14 @@ def select_step_based_on_position(position, gait_mode, rpy, frame=None):
                 flags["ENDING_FLAG3"] = True
             return step if step != -1 else walk_90(rpy)
 
-        # 赛段3出口：朝 90° 前进到 y >= 7.0
+        # 赛段3出口：朝 90° 前进，对准中心线 x=3.15 后进入赛段5
         elif flags["ENDING_FLAG4"] == False:
             if y >= 7.0:
-                flags["ENDING_FLAG4"] = True
-                return 0
+                if x >= 3.13:  # 已对准中心线 3.15（留2cm容差）
+                    flags["ENDING_FLAG4"] = True
+                    return 0
+                elif 88 < rpy < 92:
+                    return 30  # 朝向正确但偏左 → 前进+右移靠拢中心线
             return walk_90(rpy)
 
         # 赛段5：螺旋爬坡+不平整路面+跳下

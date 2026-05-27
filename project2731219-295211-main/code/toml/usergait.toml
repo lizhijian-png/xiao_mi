@@ -493,3 +493,66 @@ foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
 step_height = [ 0.12, 0.12,]
 value = 0
 duration = 0
+#31 赛段5专用：高抬腿前进（step_h=0.14，降低抬腿高度，减少上坡时脚部过高绊倒）
+[[step]]
+mode = 11
+gait_id = 27
+contact = 15
+life_count = 0
+vel_des = [ 0.14, 0.0, 0.0,]
+rpy_des = [ -0.08, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, -0.05,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.14, 0.14,]
+value = 0
+duration = 0
+
+#32 赛段5专用：斜坡前进（step_h=0.10，上坡主用步态，兼顾速度和稳定）
+[[step]]
+mode = 11
+gait_id = 27
+contact = 15
+life_count = 0
+vel_des = [ 0.16, 0.0, 0.0,]
+rpy_des = [ -0.05, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, -0.03,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.10, 0.10, ]
+value = 0
+duration = 0
+
+#33 赛段5专用：前进+左纠偏（step_h=0.12，纠偏时降低抬腿高度，避免横向倾斜处绊脚）
+[[step]]
+mode = 11
+gait_id = 27
+contact = 15
+life_count = 0
+vel_des = [ 0.14, 0.05, 0.0,]
+rpy_des = [ -0.03, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, -0.03,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.12, 0.12,]
+value = 0
+duration = 0
+
+#34 赛段5专用：前进+右纠偏（step_h=0.12，纠偏时降低抬腿高度，避免横向倾斜处绊脚）
+[[step]]
+mode = 11
+gait_id = 27
+contact = 15
+life_count = 0
+vel_des = [ 0.14, -0.05, 0.0,]
+rpy_des = [ -0.03, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, -0.03,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.12, 0.12,]
+value = 0
+duration = 0

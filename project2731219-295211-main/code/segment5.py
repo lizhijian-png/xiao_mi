@@ -44,6 +44,7 @@ STEP_CLEAR_Y = 8.3      # 台阶后继续保持高抬脚到 y=8.3，给后脚留
 
 # ── 纠偏参数 ──────────────────────────────────────────────────────
 LAT_TOLERANCE = 0.03   # 横向偏移容忍度 3cm（路宽50cm）
+SEG2_LAT_TOLERANCE = 0.015  # 第二段斜坡会把机身推向 y 较大侧，提前到1.5cm偏差就开始纠偏
 
 # ── 朝向角度 ──────────────────────────────────────────────────────
 HDG_YP = 90    # y+
@@ -104,7 +105,7 @@ def _turn_step(rpy, target_hdg):
     return 0  # 对准 → 站立
 
 
-def _forward_with_lateral(rpy, target_hdg, center_val, current_val, axis, gait_forward, gait_left, gait_right):
+def _forward_with_lateral(rpy, target_hdg, center_val, current_val, axis, gait_forward, gait_left, gait_right, tolerance=LAT_TOLERANCE):
     """
     带横向纠偏的前进控制。
 
@@ -117,6 +118,7 @@ def _forward_with_lateral(rpy, target_hdg, center_val, current_val, axis, gait_f
         gait_forward:   前进步态
         gait_left:      前进+左纠偏步态
         gait_right:     前进+右纠偏步态
+        tolerance:      横向偏移容忍度，第二段单独调小，用于更早远离黄线
 
     Returns:
         int: 步态索引
@@ -144,9 +146,9 @@ def _forward_with_lateral(rpy, target_hdg, center_val, current_val, axis, gait_f
     else:
         lateral = 0.0
 
-    if lateral > LAT_TOLERANCE:
+    if lateral > tolerance:
         return gait_left    # 偏右 → 左纠偏
-    elif lateral < -LAT_TOLERANCE:
+    elif lateral < -tolerance:
         return gait_right   # 偏左 → 右纠偏
 
     return gait_forward     # 居中直行
@@ -248,7 +250,8 @@ def segment5_control(position, gait_mode, rpy):
             _state = _ST_SEG2
             return _forward_with_lateral(
                 rpy, HDG_XN, CENTER_Y_SEG2, y, 'y',
-                gait_forward=31, gait_left=33, gait_right=34)
+                gait_forward=31, gait_left=33, gait_right=34,
+                tolerance=SEG2_LAT_TOLERANCE)
         return step
 
     # ═══════════════════════════════════════════════════════════════
@@ -261,7 +264,8 @@ def segment5_control(position, gait_mode, rpy):
             return 0
         return _forward_with_lateral(
             rpy, HDG_XN, CENTER_Y_SEG2, y, 'y',
-            gait_forward=31, gait_left=33, gait_right=34)
+            gait_forward=31, gait_left=33, gait_right=34,
+            tolerance=SEG2_LAT_TOLERANCE)
 
     # ── 转弯前稳定 ──────────────────────────────────────────────
     elif _state == _ST_PRE_TURN2:

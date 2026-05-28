@@ -19,6 +19,8 @@ usergait.toml 步态索引：
     35:上台阶高抬脚(step_h=0.18,pitch=-0.08,z=0.0)
     37:不平整路面加强左纠偏(vy=0.08) 38:不平整路面加强右纠偏(vy=-0.08)
     39:第四段更强左纠偏(vy=0.09) 40:第四段更强右纠偏(vy=-0.09)
+    50:第五段虚线后朝-x立即跳跃(vx=0.40,step_h=0.06)
+    51:第一段跳上5cm台阶(vx=0.22,step_h=0.22)
 """
 
 import math
@@ -37,11 +39,13 @@ TURN1_FORWARD_DIST = 0.20  # SEG1→SEG2: 第一次45°转完后再实际前进�
 TURN2_X = -0.35   # SEG2→SEG3: 到达 x≤-0.35 触发右转
 TURN3_Y = 15.35   # SEG3→SEG4: 到达 y≥15.35 触发右转
 TURN4_X = 3.15    # SEG4→SEG5: 到达 x≥3.15 触发右转
-SEG5_END_Y = 13.35  # SEG5 跳下区结束 (15.35 - 2.0)
+SEG5_DASH_Y = 13.6  # 第五段虚线位置，过线后转向 -x 并立即起跳
+SEG5_JUMP_DONE_Z = 0.05  # 起跳前桥面 z≈0.10，低于0.05认为已经跳下完成
 
 # 台阶位置
 STEP_Y = 7.6       # 台阶在 y=7.6
 STEP_APPROACH_Y = 7.3   # 台阶前约30cm切换到高抬脚，避免前脚到 y=7.6 台阶边缘时才开始准备
+STEP_JUMP_Y = 7.35      # 台阶前约25cm触发一次跳上动作，帮助前脚越过5cm台阶边缘
 STEP_CLEAR_Y = 8.5      # 台阶后继续保持高抬脚到 y=8.5，进一步给后脚留出完整上台阶距离
 
 # ── 纠偏参数 ──────────────────────────────────────────────────────
@@ -68,6 +72,7 @@ SLOW_DEG = 8
 # ── 状态机 ────────────────────────────────────────────────────────
 _ST_SEG1_APPROACH = "SEG1_APPROACH"
 _ST_SEG1_STEP     = "SEG1_STEP"
+_ST_SEG1_JUMP_UP  = "SEG1_JUMP_UP"
 _ST_SEG1_UPHILL   = "SEG1_UPHILL"
 _ST_PRE_TURN1     = "PRE_TURN1"
 _ST_TURN1_FORWARD = "TURN1_FORWARD"
@@ -82,6 +87,7 @@ _ST_SEG4          = "SEG4"
 _ST_PRE_TURN4     = "PRE_TURN4"
 _ST_TURN4         = "TURN4"
 _ST_SEG5_FLAT     = "SEG5_FLAT"
+_ST_SEG5_TURN_XN  = "SEG5_TURN_XN"
 _ST_SEG5_JUMP     = "SEG5_JUMP"
 _ST_DONE          = "DONE"
 
@@ -186,7 +192,7 @@ def segment5_control(position, gait_mode, rpy):
     """
     global _state, _stand_count, _turn1_forward_start
 
-    x, y, _ = position
+    x, y, z = position
     gait, mode = gait_mode
 
     # 步态切换中等待 / 趴下后站起
@@ -208,10 +214,23 @@ def segment5_control(position, gait_mode, rpy):
             rpy, HDG_YP, CENTER_X_SEG1, x, 'x',
             gait_forward=32, gait_left=33, gait_right=34)
 
-    # ── 翻越台阶：7.3 ≤ y < 8.5，提前并延长高抬脚区间，确保前后脚都越过5cm台阶 ───
+    # ── 翻越台阶：7.3 ≤ y < 8.5，先在 y=7.35 触发一次跳上动作，再保持高抬脚覆盖后脚 ───
     elif _state == _ST_SEG1_STEP:
         if y >= STEP_CLEAR_Y:
             # 台阶翻越完成，站立稳定后进入上坡
+            step = _stand_then(_ST_SEG1_UPHILL, 3)
+            return step
+        if y >= STEP_JUMP_Y:
+            # 前脚接近5cm台阶边缘时执行一次跳上动作；后续继续用 #35 覆盖后脚。
+            _state = _ST_SEG1_JUMP_UP
+            return 51
+        return _forward_with_lateral(
+            rpy, HDG_YP, CENTER_X_SEG1, x, 'x',
+            gait_forward=35, gait_left=33, gait_right=34)
+
+    # ── 跳上台阶后继续高抬脚：避免重复触发 #51，同时给后脚留通过距离 ─────
+    elif _state == _ST_SEG1_JUMP_UP:
+        if y >= STEP_CLEAR_Y:
             step = _stand_then(_ST_SEG1_UPHILL, 3)
             return step
         return _forward_with_lateral(
@@ -363,25 +382,33 @@ def segment5_control(position, gait_mode, rpy):
         return step
 
     # ═══════════════════════════════════════════════════════════════
-    # 分段5：y- (270°) 中心线 x=3.15  (3.15,15.35)→(3.15,13.35)
+    # 分段5：y- (270°) 中心线 x=3.15，过 y=13.6 虚线后转向 -x 并立即起跳
     # ═══════════════════════════════════════════════════════════════
     elif _state == _ST_SEG5_FLAT:
-        if y <= SEG5_END_Y + 0.5:  # 进入跳下区（最后0.5m）
-            _state = _ST_SEG5_JUMP
-            return 0
+        if y <= SEG5_DASH_Y:
+            # 过虚线后不再沿 y- 前进，先转向 -x，避免继续靠近 x=2.8~2.9 黄线区域。
+            _state = _ST_SEG5_TURN_XN
+            return _turn_step(rpy, HDG_XN)
         return _forward_with_lateral(
             rpy, HDG_YN, CENTER_X_SEG1, x, 'x',
             gait_forward=28, gait_left=37, gait_right=38,
             tolerance=SEG5_LAT_TOLERANCE)
 
-    # ── 跳下区 ──────────────────────────────────────────────────
+    # ── 虚线后转向 -x：转正后立即执行 #50 跳跃动作，不留前进助跑空间 ─────
+    elif _state == _ST_SEG5_TURN_XN:
+        step = _turn_step(rpy, HDG_XN)
+        if step == 0:
+            # 面向 -x 后立即起跳，不能再向前走到 x=2.8~2.9 黄线区域。
+            _state = _ST_SEG5_JUMP
+            return 50
+        return step
+
+    # ── 朝 -x 立即跳跃：根据 z 下降判断是否离开 z≈10cm 的桥面 ─────────
     elif _state == _ST_SEG5_JUMP:
-        if y <= SEG5_END_Y:
+        if z <= SEG5_JUMP_DONE_Z:
             _state = _ST_DONE
             return -1
-        return _forward_with_lateral(
-            rpy, HDG_YN, CENTER_X_SEG1, x, 'x',
-            gait_forward=1, gait_left=33, gait_right=34)
+        return 50
 
     return -1
 

@@ -1,0 +1,34 @@
+2026-05-27 21:36:02 RESET state=S4_ROUTE_TO_START obs=0 target=0
+2026-05-27 21:36:02 TICK state=S4_ROUTE_LEFT_FIND_COLA obs=0 target=0 pos=(0.000,11.100,0.000) rpy=90.0 gait=1 mode=1
+2026-05-27 21:36:02 ROUTE state=S4_ROUTE_LEFT_FIND_COLA pos=(0.000,11.100,0.000) rpy=90.0
+2026-05-27 21:36:02 ROUTE_TARGET_SCAN target=cola detected=False pos=(0.000,11.100,0.000) backup_y=11.15
+2026-05-27 21:36:02 STEP step=1 reason=route_left_find_cola_forward state=S4_ROUTE_LEFT_FIND_COLA obs=0 target=0 pos=(0.000,11.100,0.000) rpy=90.0
+2026-05-27 21:36:02 TICK state=S4_ROUTE_LEFT_FIND_COLA obs=0 target=0 pos=(0.000,11.150,0.000) rpy=90.0 gait=1 mode=1
+2026-05-27 21:36:02 ROUTE state=S4_ROUTE_LEFT_FIND_COLA pos=(0.000,11.150,0.000) rpy=90.0
+2026-05-27 21:36:02 ROUTE_TARGET_SCAN target=cola detected=False pos=(0.000,11.150,0.000) backup_y=11.15
+2026-05-27 21:36:02 ROUTE_TARGET_COORD_BACKUP target=cola pos=(0.000,11.150,0.000) backup_y=11.15 reason=reach_cola_backup_y
+2026-05-27 21:36:02 STATE old=S4_ROUTE_LEFT_FIND_COLA new=S4_ROUTE_LEFT_BACKUP_AFTER_COLA reason=route_cola_coord_backup obs=0 target=0 pos=(0.000,11.150,0.000)
+2026-05-27 21:36:02 STEP step=0 reason=route_cola_coord_backup state=S4_ROUTE_LEFT_BACKUP_AFTER_COLA obs=0 target=0 pos=(0.000,11.150,0.000) rpy=90.0
+2026-05-27 21:36:02 TICK state=S4_ROUTE_LEFT_BACKUP_AFTER_COLA obs=0 target=0 pos=(0.000,11.100,0.000) rpy=90.0 gait=1 mode=1
+2026-05-27 21:36:02 ROUTE state=S4_ROUTE_LEFT_BACKUP_AFTER_COLA pos=(0.000,11.100,0.000) rpy=90.0
+2026-05-27 21:36:02 STEP step=6 reason=route_cola_backup_before_turn state=S4_ROUTE_LEFT_BACKUP_AFTER_COLA obs=0 target=0 pos=(0.000,11.100,0.000) rpy=90.0
+2026-05-27 21:36:02 TICK state=S4_ROUTE_LEFT_BACKUP_AFTER_COLA obs=0 target=0 pos=(0.000,11.040,0.000) rpy=90.0 gait=1 mode=1
+2026-05-27 21:36:02 ROUTE state=S4_ROUTE_LEFT_BACKUP_AFTER_COLA pos=(0.000,11.040,0.000) rpy=90.0
+2026-05-27 21:36:02 STATE old=S4_ROUTE_LEFT_BACKUP_AFTER_COLA new=S4_ROUTE_LEFT_TURN_BACK reason=route_cola_backup_done obs=0 target=0 pos=(0.000,11.040,0.000)
+2026-05-27 21:36:02 STEP step=0 reason=route_cola_backup_done state=S4_ROUTE_LEFT_TURN_BACK obs=0 target=0 pos=(0.000,11.040,0.000) rpy=90.0
+2026-05-27 21:36:02 TICK state=S4_ROUTE_MID_FIND_ORANGE obs=0 target=0 pos=(1.000,11.000,0.000) rpy=90.0 gait=1 mode=1
+2026-05-27 21:36:02 ROUTE state=S4_ROUTE_MID_FIND_ORANGE pos=(1.000,11.000,0.000) rpy=90.0
+2026-05-27 21:36:02 ROUTE_TARGET_SCAN target=orange_ball detected=False pos=(1.000,11.000,0.000) target_y=11.00 backup_y=11.05
+2026-05-27 21:36:02 STEP step=1 reason=route_mid_find_orange_forward state=S4_ROUTE_MID_FIND_ORANGE obs=0 target=0 pos=(1.000,11.000,0.000) rpy=90.0
+2026-05-27 21:36:02 TICK state=S4_ROUTE_MID_FIND_ORANGE obs=0 target=0 pos=(1.000,11.050,0.000) rpy=90.0 gait=1 mode=1
+2026-05-27 21:36:02 ROUTE state=S4_ROUTE_MID_FIND_ORANGE pos=(1.000,11.050,0.000) rpy=90.0
+2026-05-27 21:36:02 ROUTE_TARGET_SCAN target=orange_ball detected=False pos=(1.000,11.050,0.000) target_y=11.00 backup_y=11.05
+2026-05-27 21:36:03 STATE old=S4_ROUTE_MID_FIND_ORANGE new=S4_ROUTE_MID_BACKUP_AFTER_ORANGE reason=route_orange_coord_backup obs=0 target=0 pos=(1.000,11.050,0.000)
+2026-05-27 21:36:03 STEP step=0 reason=route_orange_coord_backup state=S4_ROUTE_MID_BACKUP_AFTER_ORANGE obs=0 target=0 pos=(1.000,11.050,0.000) rpy=90.0
+2026-05-27 21:36:03 TICK state=S4_ROUTE_MID_BACKUP_AFTER_ORANGE obs=0 target=0 pos=(1.000,11.000,0.000) rpy=90.0 gait=1 mode=1
+2026-05-27 21:36:03 ROUTE state=S4_ROUTE_MID_BACKUP_AFTER_ORANGE pos=(1.000,11.000,0.000) rpy=90.0
+2026-05-27 21:36:03 STEP step=6 reason=route_orange_backup_before_turn state=S4_ROUTE_MID_BACKUP_AFTER_ORANGE obs=0 target=0 pos=(1.000,11.000,0.000) rpy=90.0
+2026-05-27 21:36:03 TICK state=S4_ROUTE_MID_BACKUP_AFTER_ORANGE obs=0 target=0 pos=(1.000,10.940,0.000) rpy=90.0 gait=1 mode=1
+2026-05-27 21:36:03 ROUTE state=S4_ROUTE_MID_BACKUP_AFTER_ORANGE pos=(1.000,10.940,0.000) rpy=90.0
+2026-05-27 21:36:03 STATE old=S4_ROUTE_MID_BACKUP_AFTER_ORANGE new=S4_ROUTE_MID_TURN_BACK reason=route_orange_backup_done obs=0 target=0 pos=(1.000,10.940,0.000)
+2026-05-27 21:36:03 STEP step=0 reason=route_orange_backup_done state=S4_ROUTE_MID_TURN_BACK obs=0 target=0 pos=(1.000,10.940,0.000) rpy=90.0

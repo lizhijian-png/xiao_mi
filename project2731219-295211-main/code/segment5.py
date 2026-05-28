@@ -47,6 +47,9 @@ STEP_CLEAR_Y = 8.5      # 台阶后继续保持高抬脚到 y=8.5，进一步给
 # ── 纠偏参数 ──────────────────────────────────────────────────────
 LAT_TOLERANCE = 0.03   # 横向偏移容忍度 3cm（路宽50cm）
 SEG2_LAT_TOLERANCE = 0.015  # 第二段斜坡会把机身推向 y 较大侧，提前到1.5cm偏差就开始纠偏
+SEG3_LAT_TOLERANCE = 0.015  # 第三段提前到1.5cm偏差就开始纠偏，减少横坡累积偏移
+SEG4_LAT_TOLERANCE = 0.015  # 第四段提前到1.5cm偏差就开始纠偏，配合持续预补偿防止后脚下滑
+SEG5_LAT_TOLERANCE = 0.015  # 第五段平路用于更早回正，避免带着前面累积偏差歪着走
 
 # ── 朝向角度 ──────────────────────────────────────────────────────
 HDG_YP = 90    # y+
@@ -291,7 +294,8 @@ def segment5_control(position, gait_mode, rpy):
             _state = _ST_SEG3
             return _forward_with_lateral(
                 rpy, HDG_YP, CENTER_X_SEG3, x, 'x',
-                gait_forward=31, gait_left=37, gait_right=38)
+                gait_forward=31, gait_left=37, gait_right=38,
+                gait_center=37)
         return step
 
     # ═══════════════════════════════════════════════════════════════
@@ -304,7 +308,8 @@ def segment5_control(position, gait_mode, rpy):
             return _turn_step(rpy, HDG_TURN3_MID)
         return _forward_with_lateral(
             rpy, HDG_YP, CENTER_X_SEG3, x, 'x',
-            gait_forward=31, gait_left=37, gait_right=38)
+            gait_forward=31, gait_left=37, gait_right=38,
+            tolerance=SEG3_LAT_TOLERANCE, gait_center=37)
 
     # ── 第一次转45°：由90°转到45°，不站立等待，直接衔接第二次45° ──────
     elif _state == _ST_PRE_TURN3:
@@ -321,7 +326,8 @@ def segment5_control(position, gait_mode, rpy):
             _state = _ST_SEG4
             return _forward_with_lateral(
                 rpy, HDG_XP, CENTER_Y_SEG4, y, 'y',
-                gait_forward=31, gait_left=37, gait_right=38)
+                gait_forward=31, gait_left=39, gait_right=40,
+                tolerance=SEG4_LAT_TOLERANCE, gait_center=39)
         return step
 
     # ═══════════════════════════════════════════════════════════════
@@ -335,7 +341,7 @@ def segment5_control(position, gait_mode, rpy):
         return _forward_with_lateral(
             rpy, HDG_XP, CENTER_Y_SEG4, y, 'y',
             gait_forward=31, gait_left=39, gait_right=40,
-            gait_center=39)
+            tolerance=SEG4_LAT_TOLERANCE, gait_center=39)
 
     # ── 第一次转45°：由0°转到315°，不站立等待，直接衔接第二次45° ─────
     elif _state == _ST_PRE_TURN4:
@@ -352,7 +358,8 @@ def segment5_control(position, gait_mode, rpy):
             _state = _ST_SEG5_FLAT
             return _forward_with_lateral(
                 rpy, HDG_YN, CENTER_X_SEG1, x, 'x',
-                gait_forward=28, gait_left=33, gait_right=34)
+                gait_forward=28, gait_left=37, gait_right=38,
+                tolerance=SEG5_LAT_TOLERANCE)
         return step
 
     # ═══════════════════════════════════════════════════════════════
@@ -364,7 +371,8 @@ def segment5_control(position, gait_mode, rpy):
             return 0
         return _forward_with_lateral(
             rpy, HDG_YN, CENTER_X_SEG1, x, 'x',
-            gait_forward=28, gait_left=33, gait_right=34)
+            gait_forward=28, gait_left=37, gait_right=38,
+            tolerance=SEG5_LAT_TOLERANCE)
 
     # ── 跳下区 ──────────────────────────────────────────────────
     elif _state == _ST_SEG5_JUMP:

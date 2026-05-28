@@ -110,7 +110,7 @@ def _turn_step(rpy, target_hdg):
     return 0  # 对准 → 站立
 
 
-def _forward_with_lateral(rpy, target_hdg, center_val, current_val, axis, gait_forward, gait_left, gait_right, tolerance=LAT_TOLERANCE):
+def _forward_with_lateral(rpy, target_hdg, center_val, current_val, axis, gait_forward, gait_left, gait_right, tolerance=LAT_TOLERANCE, gait_center=None):
     """
     带横向纠偏的前进控制。
 
@@ -124,6 +124,7 @@ def _forward_with_lateral(rpy, target_hdg, center_val, current_val, axis, gait_f
         gait_left:      前进+左纠偏步态
         gait_right:     前进+右纠偏步态
         tolerance:      横向偏移容忍度，第二段单独调小，用于更早远离黄线
+        gait_center:    居中时使用的步态；第四段用左纠偏预补偿，抵消后脚向低处滑
 
     Returns:
         int: 步态索引
@@ -155,6 +156,9 @@ def _forward_with_lateral(rpy, target_hdg, center_val, current_val, axis, gait_f
         return gait_left    # 偏右 → 左纠偏
     elif lateral < -tolerance:
         return gait_right   # 偏左 → 右纠偏
+
+    if gait_center is not None:
+        return gait_center   # 居中时也保持预补偿，避免后脚先向低处滑
 
     return gait_forward     # 居中直行
 
@@ -330,7 +334,8 @@ def segment5_control(position, gait_mode, rpy):
             return _turn_step(rpy, HDG_TURN4_MID)
         return _forward_with_lateral(
             rpy, HDG_XP, CENTER_Y_SEG4, y, 'y',
-            gait_forward=31, gait_left=39, gait_right=40)
+            gait_forward=31, gait_left=39, gait_right=40,
+            gait_center=39)
 
     # ── 第一次转45°：由0°转到315°，不站立等待，直接衔接第二次45° ─────
     elif _state == _ST_PRE_TURN4:

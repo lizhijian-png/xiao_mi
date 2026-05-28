@@ -652,3 +652,35 @@ foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
 step_height = [ 0.12, 0.12,]
 value = 0
 duration = 0
+
+#50 赛段5跳跃动作：虚线后转向-x立即起跳（速度0.40，抬脚0.06，避免触碰x=2.8~2.9黄线）
+[[step]]
+mode = 11
+gait_id = 27
+contact = 15
+life_count = 0
+vel_des = [ 0.40, 0.0, 0.0,]
+rpy_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.0,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.06, 0.06,]
+value = 0
+duration = 0
+
+#51 赛段5上台阶跳跃动作：y=7.35附近跳上一开始的5cm台阶（速度0.22，抬脚0.22）
+[[step]]
+mode = 11
+gait_id = 27
+contact = 15
+life_count = 0
+vel_des = [ 0.22, 0.0, 0.0,]
+rpy_des = [ -0.08, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.0,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.22, 0.22,]
+value = 0
+duration = 0

@@ -18,6 +18,7 @@ usergait.toml 步态索引：
     33:左纠偏(step_h=0.12,pitch=-0.03,z=-0.03) 34:右纠偏(step_h=0.12,pitch=-0.03,z=-0.03)
     35:上台阶高抬脚(step_h=0.18,pitch=-0.08,z=0.0)
     37:不平整路面加强左纠偏(vy=0.08) 38:不平整路面加强右纠偏(vy=-0.08)
+    39:第四段更强左纠偏(vy=0.09) 40:第四段更强右纠偏(vy=-0.09)
 """
 
 import math
@@ -329,7 +330,7 @@ def segment5_control(position, gait_mode, rpy):
             return _turn_step(rpy, HDG_TURN4_MID)
         return _forward_with_lateral(
             rpy, HDG_XP, CENTER_Y_SEG4, y, 'y',
-            gait_forward=31, gait_left=37, gait_right=38)
+            gait_forward=31, gait_left=39, gait_right=40)
 
     # ── 第一次转45°：由0°转到315°，不站立等待，直接衔接第二次45° ─────
     elif _state == _ST_PRE_TURN4:

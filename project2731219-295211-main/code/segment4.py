@@ -24,30 +24,38 @@ RIGHT_LANE_X = 2.10
 LANE_SWITCH_Y = 7.10
 ROUTE_SWITCH_Y = 8.90
 
-# 第四段入口、可乐撞击偏移点、独木桥入口相关坐标。
+# 第四段入口、可乐撞击偏移点、第五段入口相关坐标。
 START_POINT = (3.10, 7.10)
 COLA_APPROACH_X = 0.00
 BRIDGE_SWITCH_POINT = (RIGHT_LANE_X, LANE_SWITCH_Y)
-BRIDGE_APPROACH_POINT = (3.75, LANE_SWITCH_Y)
-BRIDGE_START = (3.75, 7.60)
+BRIDGE_APPROACH_POINT = (3.15, LANE_SWITCH_Y)
+SEG5_ENTRY_HEADING = 90
 
-# 左侧限高杆范围；右侧第三段固定在 y=10.00 开始低姿态。
-LEFT_BAR = {"x": LEFT_LANE_X, "y_min": 8.95, "y_max": 9.95}
+# 左侧限高杆固定在 y=9.40m，低姿态覆盖 y=9.40+-0.40m。
+LEFT_BAR = {"x": LEFT_LANE_X, "y": 9.40, "y_min": 9.00, "y_max": 9.80}
+LEFT_BAR_LOW_END_Y = LEFT_BAR["y_max"]
+
+# 右侧第三段限高杆固定在 y=10.40m；y>10.00m 后保持低姿态，回退到 y=10.40m 才站起。
+RIGHT_BAR_Y = 10.40
 RIGHT_LOW_START_Y = 10.00
+RIGHT_STAND_Y = RIGHT_BAR_Y
 
 # 目标物坐标和动作结束坐标。
 # 可乐：到 y=11.10 播报，到 y=11.15 开始倒退。
 # 小球：到 y=11.00 播报，到 y=11.05 开始倒退。
-# 足球：到 y=11.20 播报，低姿态走到 y=11.40 后开始回退。
+# 足球：到 y=11.10 播报并开始回退。
 COLA = {"x": LEFT_LANE_X, "y": 11.10, "backup_y": 11.15}
 ORANGE_BALL = {"x": 0.94, "y": 11.00, "backup_y": 11.05}
-FOOTBALL = {"x": RIGHT_LANE_X, "announce_y": 11.20, "backup_y": 11.40}
+FOOTBALL = {"x": RIGHT_LANE_X, "announce_y": 11.10, "backup_y": 11.10}
 
 # 限高杆检测和动作距离参数。
-LEFT_BAR_DETECT_UP_Y = LEFT_BAR["y_min"] - 0.20
-LEFT_BAR_DETECT_DOWN_Y = LEFT_BAR["y_max"] + 0.20
-BAR_CLEAR_MARGIN = 0.30
+LEFT_BAR_DETECT_UP_Y = LEFT_BAR["y_min"]
+LEFT_BAR_DETECT_DOWN_Y = LEFT_BAR["y_max"]
+BAR_CLEAR_MARGIN = 0.00
 TARGET_BACKUP_DIST = 0.10
+COLA_BACKUP_DIST = 0.15
+ORANGE_BACKUP_DIST = 0.15
+FOOTBALL_BACKUP_AFTER_KICK_DIST = 0.10
 
 
 # 步态编号和朝向角度。
@@ -74,12 +82,16 @@ S = {
     "LEFT_TURN_UP": "S4_LEFT_TURN_UP",
     "LEFT_ALIGN_UP": "S4_LEFT_ALIGN_UP",
     "LEFT_BAR_UP": "S4_LEFT_BAR_UP",
+    "LEFT_BAR_UP_LOW": "S4_LEFT_BAR_UP_LOW",
+    "LEFT_STAND_AFTER_BAR": "S4_LEFT_STAND_AFTER_BAR",
     "LEFT_ALIGN_COLA": "S4_LEFT_ALIGN_COLA",
     "LEFT_FIND_COLA": "S4_LEFT_FIND_COLA",
     "LEFT_BACKUP_COLA": "S4_LEFT_BACKUP_COLA",
     "LEFT_TURN_BACK": "S4_LEFT_TURN_BACK",
     "LEFT_ALIGN_DOWN": "S4_LEFT_ALIGN_DOWN",
     "LEFT_BAR_DOWN": "S4_LEFT_BAR_DOWN",
+    "LEFT_BAR_DOWN_LOW": "S4_LEFT_BAR_DOWN_LOW",
+    "LEFT_RETURN_Y": "S4_LEFT_RETURN_Y",
     "LEFT_TURN_EAST": "S4_LEFT_TURN_EAST",
     "MID_TO_LANE": "S4_MID_TO_LANE",
     "MID_TURN_UP": "S4_MID_TURN_UP",
@@ -97,6 +109,7 @@ S = {
     "RIGHT_TO_LOW_START": "S4_RIGHT_TO_LOW_START",
     "RIGHT_LOW_FORWARD": "S4_RIGHT_LOW_FORWARD",
     "RIGHT_ALIGN_AFTER_BALL": "S4_RIGHT_ALIGN_AFTER_BALL",
+    "RIGHT_TURN_BACK_LOW": "S4_RIGHT_TURN_BACK_LOW",
     "RIGHT_BACKUP_LOW": "S4_RIGHT_BACKUP_LOW",
     "RIGHT_STAND": "S4_RIGHT_STAND",
     "RIGHT_TURN_DOWN": "S4_RIGHT_TURN_DOWN",
@@ -105,15 +118,22 @@ S = {
     "RIGHT_TURN_EAST": "S4_RIGHT_TURN_EAST",
     "BRIDGE_TO_X": "S4_BRIDGE_TO_X",
     "BRIDGE_TURN_UP": "S4_BRIDGE_TURN_UP",
-    "BRIDGE_APPROACH": "S4_BRIDGE_APPROACH",
     "DONE": "S4_DONE",
 }
 
 LOW_STATES = {
-    S["LEFT_BAR_UP"],
-    S["LEFT_BAR_DOWN"],
+    S["LEFT_BAR_UP_LOW"],
+    S["LEFT_BAR_DOWN_LOW"],
     S["RIGHT_LOW_FORWARD"],
     S["RIGHT_ALIGN_AFTER_BALL"],
+    S["RIGHT_TURN_BACK_LOW"],
+    S["RIGHT_BACKUP_LOW"],
+}
+
+RIGHT_LOW_REQUIRED_STATES = {
+    S["RIGHT_LOW_FORWARD"],
+    S["RIGHT_ALIGN_AFTER_BALL"],
+    S["RIGHT_TURN_BACK_LOW"],
     S["RIGHT_BACKUP_LOW"],
 }
 
@@ -314,9 +334,9 @@ def _adjust_x(position, rpy, lane_x, heading, next_state, reason):
     return _return_step(lateral_step, f"{reason}_strafe_x", position, rpy)
 
 
-def _backup_to_distance(position, next_state, reason):
+def _backup_to_distance(position, next_state, reason, distance=TARGET_BACKUP_DIST):
     """后退固定距离后切换状态。"""
-    if _dist_from_start(position) >= TARGET_BACKUP_DIST:
+    if _dist_from_start(position) >= distance:
         _set_state(next_state, reason, position)
         _motion_start_reset(position)
         return 0
@@ -430,39 +450,54 @@ def _detect_target(frame, kind):
     return False
 
 
-def _route(position, rpy, frame):
-    global _motion_start, _right_low_start
+def _route_entry(position, rpy):
+    """入口段：回到第四段底部横向通道，并切入第一条竖道。"""
+    _, y, _ = position
+
+    if abs(y - START_POINT[1]) > XY_TOL:
+        heading = HEADING_NORTH if START_POINT[1] > y else HEADING_SOUTH
+        return _return_step(_forward_step(rpy, heading), "route_to_start_fix_y", position, rpy)
+    return _go_x(position, rpy, START_POINT[0], 180, S["LEFT_TO_LANE"], "route_start_reached")
+
+
+def _route_left_lane(position, rpy, frame):
+    """第一条竖道：过左侧限高杆，撞倒可乐瓶，再返回换道线。"""
+    global _motion_start
 
     x, y, _ = position
-    _log_event("ROUTE", state=_state, pos=_fmt_pos(position), rpy=f"{rpy:.1f}")
 
-    if _state == S["TO_START"]:
-        if abs(y - START_POINT[1]) > XY_TOL:
-            heading = HEADING_NORTH if START_POINT[1] > y else HEADING_SOUTH
-            return _return_step(_forward_step(rpy, heading), "route_to_start_fix_y", position, rpy)
-        return _go_x(position, rpy, START_POINT[0], 180, S["LEFT_TO_LANE"], "route_start_reached")
-
+    # 进入左侧竖道并调整到向上。
     if _state == S["LEFT_TO_LANE"]:
         return _go_x(position, rpy, LEFT_LANE_X, 180, S["LEFT_TURN_UP"], "route_left_lane_reached")
     if _state == S["LEFT_TURN_UP"]:
         return _turn_state(rpy, HEADING_NORTH, S["LEFT_ALIGN_UP"], "route_left_turn_up_done", position)
     if _state == S["LEFT_ALIGN_UP"]:
         return _adjust_x(position, rpy, LEFT_LANE_X, HEADING_NORTH, S["LEFT_BAR_UP"], "route_left_align_up_done")
+
+    # 上行过限高杆：到 y=9.00 后先切入低姿态状态，再锁定低姿态走到 y=9.80。
     if _state == S["LEFT_BAR_UP"]:
-        if _motion_start is not None:
-            if y >= LEFT_BAR["y_max"] + BAR_CLEAR_MARGIN:
-                _motion_start = None
-                _set_state(S["LEFT_ALIGN_COLA"], "route_left_bar_up_clear", position)
-                return _return_step(0, "route_left_bar_up_clear", position, rpy)
-            return _return_step(_forward_step(rpy, HEADING_NORTH, LOW_BAR_GAIT), "route_left_bar_up_keep_low", position, rpy)
-        if y >= LEFT_BAR_DETECT_UP_Y or _detect_limit_bar_ahead(frame):
+        if y >= LEFT_BAR_DETECT_UP_Y:
             _announce_once("left_bar_up", "限高杆")
-            _motion_start_reset(position)
+            _motion_start = None
+            _set_state(S["LEFT_BAR_UP_LOW"], "route_left_bar_up_enter_low", position)
             return _return_step(LOW_BAR_GAIT, "route_left_bar_up_enter_low", position, rpy)
         return _return_step(_forward_step(rpy, HEADING_NORTH), "route_left_bar_up_forward", position, rpy)
+    if _state == S["LEFT_BAR_UP_LOW"]:
+        if y >= LEFT_BAR_LOW_END_Y:
+            _motion_start = None
+            _set_state(S["LEFT_STAND_AFTER_BAR"], "route_left_bar_up_clear", position)
+            return _return_step(0, "route_left_bar_up_clear", position, rpy)
+        return _return_step(_forward_step(rpy, HEADING_NORTH, LOW_BAR_GAIT), "route_left_bar_up_keep_low", position, rpy)
 
+    # 起身后再进入撞可乐前的横向对齐，避免蹲起和横移叠在一起。
+    if _state == S["LEFT_STAND_AFTER_BAR"]:
+        _motion_start = None
+        _set_state(S["LEFT_ALIGN_COLA"], "route_left_stand_after_bar_done", position)
+        return _return_step(0, "route_left_stand_after_bar_done", position, rpy)
     if _state == S["LEFT_ALIGN_COLA"]:
         return _adjust_x(position, rpy, COLA_APPROACH_X, HEADING_NORTH, S["LEFT_FIND_COLA"], "route_left_align_cola_done")
+
+    # 可乐瓶：识别或到达固定坐标后播报，继续向前撞倒，再后退 0.15m。
     if _state == S["LEFT_FIND_COLA"]:
         detected = _detect_target(frame, "cola")
         _log_event("ROUTE_TARGET_SCAN", target="cola", detected=detected, pos=_fmt_pos(position))
@@ -474,31 +509,56 @@ def _route(position, rpy, frame):
             return _return_step(0, "route_cola_backup_start", position, rpy)
         return _return_step(_forward_step(rpy, HEADING_NORTH), "route_left_find_cola_forward", position, rpy)
     if _state == S["LEFT_BACKUP_COLA"]:
-        step = _backup_to_distance(position, S["LEFT_TURN_BACK"], "route_cola_backup_done")
+        step = _backup_to_distance(position, S["LEFT_TURN_BACK"], "route_cola_backup_done", COLA_BACKUP_DIST)
         return _return_step(step, "route_cola_backup", position, rpy)
+
+    # 返回左侧竖道中心线，下行时先正常走，到 9.80-9.00 区间才锁定低姿态。
     if _state == S["LEFT_TURN_BACK"]:
+        _motion_start = None
         return _turn_state(rpy, HEADING_SOUTH, S["LEFT_ALIGN_DOWN"], "route_left_turn_back_done", position)
     if _state == S["LEFT_ALIGN_DOWN"]:
+        _motion_start = None
         return _adjust_x(position, rpy, LEFT_LANE_X, HEADING_SOUTH, S["LEFT_BAR_DOWN"], "route_left_align_down_done")
     if _state == S["LEFT_BAR_DOWN"]:
-        if y <= ROUTE_SWITCH_Y + XY_TOL:
+        if y <= ROUTE_SWITCH_Y:
             _motion_start = None
             _set_state(S["LEFT_TURN_EAST"], "route_left_return_y_reached", position)
             return _return_step(0, "route_left_return_y_reached", position, rpy)
-        if _motion_start is not None or y <= LEFT_BAR_DETECT_DOWN_Y:
-            _motion_start = _motion_start or [x, y]
+        if y <= LEFT_BAR_DETECT_DOWN_Y:
             _announce_once("left_bar_down", "限高杆")
-            return _return_step(_forward_step(rpy, HEADING_SOUTH, LOW_BAR_GAIT), "route_left_bar_down_keep_low", position, rpy)
+            _set_state(S["LEFT_BAR_DOWN_LOW"], "route_left_bar_down_enter_low", position)
+            return _return_step(LOW_BAR_GAIT, "route_left_bar_down_enter_low", position, rpy)
         return _return_step(_forward_step(rpy, HEADING_SOUTH), "route_left_bar_down_forward", position, rpy)
+    if _state == S["LEFT_BAR_DOWN_LOW"]:
+        if y <= LEFT_BAR["y_min"]:
+            _motion_start = None
+            _set_state(S["LEFT_RETURN_Y"], "route_left_bar_down_clear", position)
+            return _return_step(0, "route_left_bar_down_clear", position, rpy)
+        return _return_step(_forward_step(rpy, HEADING_SOUTH, LOW_BAR_GAIT), "route_left_bar_down_keep_low", position, rpy)
+    if _state == S["LEFT_RETURN_Y"]:
+        if y <= ROUTE_SWITCH_Y:
+            _set_state(S["LEFT_TURN_EAST"], "route_left_return_y_reached", position)
+            return _return_step(0, "route_left_return_y_reached", position, rpy)
+        return _return_step(_forward_step(rpy, HEADING_SOUTH), "route_left_return_to_8_90", position, rpy)
     if _state == S["LEFT_TURN_EAST"]:
         return _turn_state(rpy, HEADING_EAST, S["MID_TO_LANE"], "route_left_turn_east_done", position)
 
+    return None
+
+
+def _route_mid_lane(position, rpy, frame):
+    """第二条竖道：撞击橙色小球，返程识别不可跨越障碍，再切到第三条竖道。"""
+    _, y, _ = position
+
+    # 进入中间竖道。
     if _state == S["MID_TO_LANE"]:
         return _go_x(position, rpy, MID_LANE_X, HEADING_EAST, S["MID_TURN_UP"], "route_mid_lane_reached")
     if _state == S["MID_TURN_UP"]:
         return _turn_state(rpy, HEADING_NORTH, S["MID_ALIGN_UP"], "route_mid_turn_up_done", position)
     if _state == S["MID_ALIGN_UP"]:
         return _adjust_x(position, rpy, MID_LANE_X, HEADING_NORTH, S["MID_FIND_ORANGE"], "route_mid_align_up_done")
+
+    # 橙色小球：识别或到达固定坐标后播报，继续向前撞击，再后退 0.15m。
     if _state == S["MID_FIND_ORANGE"]:
         detected = _detect_target(frame, "orange_ball")
         _log_event("ROUTE_TARGET_SCAN", target="orange_ball", detected=detected, pos=_fmt_pos(position))
@@ -510,8 +570,10 @@ def _route(position, rpy, frame):
             return _return_step(0, "route_orange_backup_start", position, rpy)
         return _return_step(_forward_step(rpy, HEADING_NORTH), "route_mid_find_orange_forward", position, rpy)
     if _state == S["MID_BACKUP_ORANGE"]:
-        step = _backup_to_distance(position, S["MID_TURN_BACK"], "route_orange_backup_done")
+        step = _backup_to_distance(position, S["MID_TURN_BACK"], "route_orange_backup_done", ORANGE_BACKUP_DIST)
         return _return_step(step, "route_orange_backup", position, rpy)
+
+    # 返程：回到中线并检查不可跨越障碍，播报后回到换道线。
     if _state == S["MID_TURN_BACK"]:
         return _turn_state(rpy, HEADING_SOUTH, S["MID_ALIGN_DOWN"], "route_mid_turn_back_done", position)
     if _state == S["MID_ALIGN_DOWN"]:
@@ -527,35 +589,65 @@ def _route(position, rpy, frame):
     if _state == S["MID_TURN_EAST"]:
         return _turn_state(rpy, HEADING_EAST, S["RIGHT_TO_LANE"], "route_mid_turn_east_done", position)
 
+    return None
+
+
+def _route_right_lane(position, rpy, frame):
+    """第三条竖道：蹲姿过右侧限高杆，撞足球入门，再蹲姿返回到 y=10.40 后站起。"""
+    global _motion_start, _right_low_start
+
+    _, y, _ = position
+
+    # 进入右侧竖道。
     if _state == S["RIGHT_TO_LANE"]:
         return _go_x(position, rpy, RIGHT_LANE_X, HEADING_EAST, S["RIGHT_TURN_UP"], "route_right_lane_reached")
     if _state == S["RIGHT_TURN_UP"]:
         return _turn_state(rpy, HEADING_NORTH, S["RIGHT_ALIGN_UP"], "route_right_turn_up_done", position)
     if _state == S["RIGHT_ALIGN_UP"]:
         return _adjust_x(position, rpy, RIGHT_LANE_X, HEADING_NORTH, S["RIGHT_TO_LOW_START"], "route_right_align_up_done")
+
+    # 到 y=10.00 后进入低姿态区间；站起点固定为右侧限高杆 y=10.40。
     if _state == S["RIGHT_TO_LOW_START"]:
         if y >= RIGHT_LOW_START_Y:
-            _right_low_start = [RIGHT_LANE_X, RIGHT_LOW_START_Y]
-            _announce_once("right_bar", "限高杆")
+            _right_low_start = [RIGHT_LANE_X, RIGHT_STAND_Y]
             _set_state(S["RIGHT_LOW_FORWARD"], "route_right_enter_low_at_10m", position)
             return _return_step(LOW_BAR_GAIT, "route_right_enter_low_at_10m", position, rpy)
         return _return_step(_forward_step(rpy, HEADING_NORTH), "route_right_forward_to_low_start", position, rpy)
+
+    # 低姿态前进：过限高杆后继续推足球，到 y=11.10 认为足球已进门。
     if _state == S["RIGHT_LOW_FORWARD"]:
         detected = _detect_target(frame, "football")
         _log_event("ROUTE_TARGET_SCAN", target="football", detected=detected, pos=_fmt_pos(position))
+        if y >= RIGHT_BAR_Y:
+            _announce_once("right_bar", "限高杆")
         if detected or y >= FOOTBALL["announce_y"]:
             _announce_once("football", "足球")
         if y >= FOOTBALL["backup_y"]:
-            _set_state(S["RIGHT_ALIGN_AFTER_BALL"], "route_football_reach_11_4", position)
-            return _return_step(0, "route_football_reach_11_4", position, rpy)
+            _motion_start_reset(position)
+            _set_state(S["RIGHT_ALIGN_AFTER_BALL"], "route_football_reach_11_10", position)
+            return _return_step(LOW_BAR_GAIT, "route_football_reach_11_10", position, rpy)
         return _return_step(_forward_step(rpy, HEADING_NORTH, LOW_BAR_GAIT), "route_right_low_forward", position, rpy)
+
+    # 足球到位后先短退 0.10m，再转身，改为低姿态向前走回 y=10.40。
     if _state == S["RIGHT_ALIGN_AFTER_BALL"]:
-        return _adjust_x(position, rpy, RIGHT_LANE_X, HEADING_NORTH, S["RIGHT_BACKUP_LOW"], "route_right_align_after_ball_done")
+        if _dist_from_start(position) >= FOOTBALL_BACKUP_AFTER_KICK_DIST:
+            _set_state(S["RIGHT_TURN_BACK_LOW"], "route_right_backup_after_ball_done", position)
+            _motion_start_reset(position)
+            return _return_step(LOW_BAR_GAIT, "route_right_backup_after_ball_done", position, rpy)
+        return _return_step(6, "route_right_backup_after_ball", position, rpy)
+    if _state == S["RIGHT_TURN_BACK_LOW"]:
+        step = _turn_to(rpy, HEADING_SOUTH)
+        if step == 1:
+            _set_state(S["RIGHT_BACKUP_LOW"], "route_right_turn_back_low_done", position)
+            return _return_step(LOW_BAR_GAIT, "route_right_turn_back_low_done", position, rpy)
+        return _return_step(step, "route_right_turn_back_low_done_turn", position, rpy)
     if _state == S["RIGHT_BACKUP_LOW"]:
-        if _right_low_start is None or y <= _right_low_start[1] + XY_TOL:
-            _set_state(S["RIGHT_STAND"], "route_right_backup_to_10m_done", position)
-            return _return_step(0, "route_right_backup_to_10m_done", position, rpy)
-        return _return_step(6, "route_right_backup_low", position, rpy)
+        if _right_low_start is None or y <= _right_low_start[1]:
+            _set_state(S["RIGHT_STAND"], "route_right_low_return_to_10_4m_done", position)
+            return _return_step(0, "route_right_low_return_to_10_4m_done", position, rpy)
+        return _return_step(_forward_step(rpy, HEADING_SOUTH, LOW_BAR_GAIT), "route_right_low_forward_back_to_bar", position, rpy)
+
+    # 站起后回到右侧竖道中心线，准备从底部通道去第五段入口。
     if _state == S["RIGHT_STAND"]:
         _motion_start = None
         _set_state(S["RIGHT_TURN_DOWN"], "route_right_stand_done", position)
@@ -566,6 +658,12 @@ def _route(position, rpy, frame):
         _right_low_start = None
         return _adjust_x(position, rpy, RIGHT_LANE_X, HEADING_SOUTH, S["RIGHT_RETURN_Y"], "route_right_align_down_done")
 
+    return None
+
+
+def _route_bridge_exit(position, rpy):
+    """收尾段：回到底部横向通道，在第五段入口中心线转正后交给 segment5。"""
+
     if _state == S["RIGHT_RETURN_Y"]:
         return _go_y(position, rpy, BRIDGE_SWITCH_POINT[1], HEADING_SOUTH, S["RIGHT_TURN_EAST"], "route_right_return_switch_y_reached")
     if _state == S["RIGHT_TURN_EAST"]:
@@ -573,18 +671,38 @@ def _route(position, rpy, frame):
     if _state == S["BRIDGE_TO_X"]:
         return _go_x(position, rpy, BRIDGE_APPROACH_POINT[0], HEADING_EAST, S["BRIDGE_TURN_UP"], "route_bridge_x_reached")
     if _state == S["BRIDGE_TURN_UP"]:
-        return _turn_state(rpy, HEADING_NORTH, S["BRIDGE_APPROACH"], "route_bridge_turn_up_done", position)
-    if _state == S["BRIDGE_APPROACH"]:
-        if y >= BRIDGE_START[1] - XY_TOL:
-            _set_state(S["DONE"], "route_bridge_front_feet_on", position)
-            return _return_step(-1, "segment4_done_bridge_front_feet_on", position, rpy)
-        return _return_step(_forward_step(rpy, HEADING_NORTH), "route_bridge_approach_forward", position, rpy)
+        step = _turn_to(rpy, SEG5_ENTRY_HEADING)
+        if step == 1:
+            _set_state(S["DONE"], "route_seg5_entry_aligned", position)
+            return _return_step(-1, "segment4_done_seg5_entry_aligned", position, rpy)
+        return _return_step(step, "route_seg5_entry_align_turn", position, rpy)
+
+    return None
+
+
+def _route(position, rpy, frame):
+    """第四段总调度：按状态把控制权分发给各条竖道的小状态机。"""
+    _log_event("ROUTE", state=_state, pos=_fmt_pos(position), rpy=f"{rpy:.1f}")
+
+    if _state == S["TO_START"]:
+        return _route_entry(position, rpy)
+
+    for handler in (
+        _route_left_lane,
+        _route_mid_lane,
+        _route_right_lane,
+        _route_bridge_exit,
+    ):
+        step = handler(position, rpy, frame) if handler is not _route_bridge_exit else handler(position, rpy)
+        if step is not None:
+            return step
 
     _set_state(S["DONE"], "route_unknown_state_done", position)
     return _return_step(-1, "route_unknown_state_done", position, rpy)
 
 
 def segment4_control(position, gait_mode, rpy, frame=None):
+    """对外接口：返回当前应执行的步态编号，返回 -1 表示第四段完成。"""
     global _last_log_time, _last_log_signature
 
     x, y, _ = position
@@ -599,8 +717,35 @@ def segment4_control(position, gait_mode, rpy, frame=None):
     if _state == S["DONE"]:
         return _return_step(-1, "segment4_done", position, rpy)
 
+    if _state == S["RIGHT_TO_LOW_START"]:
+        return _route(position, rpy, frame)
+
     switching_gait = (gait == 0 and mode == 0) or (gait == 1 and mode == 9)
     if switching_gait:
+        if _state == S["LEFT_BAR_UP"]:
+            if y >= LEFT_BAR_DETECT_UP_Y:
+                return _route(position, rpy, frame)
+            return _return_step(_forward_step(rpy, HEADING_NORTH), "gait_switch_left_bar_forward", position, rpy)
+        if _state == S["LEFT_BAR_UP_LOW"]:
+            if y >= LEFT_BAR_LOW_END_Y:
+                return _route(position, rpy, frame)
+            return _return_step(LOW_BAR_GAIT, "gait_switch_keep_left_bar_up_low", position, rpy)
+        if _state == S["LEFT_BAR_DOWN"]:
+            if y <= LEFT_BAR_DETECT_DOWN_Y:
+                return _route(position, rpy, frame)
+            return _return_step(_forward_step(rpy, HEADING_SOUTH), "gait_switch_left_bar_down_forward", position, rpy)
+        if _state == S["LEFT_BAR_DOWN_LOW"]:
+            if y <= LEFT_BAR["y_min"]:
+                return _route(position, rpy, frame)
+            return _return_step(LOW_BAR_GAIT, "gait_switch_keep_left_bar_down_low", position, rpy)
+        if _state == S["LEFT_RETURN_Y"]:
+            if y <= ROUTE_SWITCH_Y:
+                return _route(position, rpy, frame)
+            return _return_step(_forward_step(rpy, HEADING_SOUTH), "gait_switch_left_return_to_8_90", position, rpy)
+        if _state == S["RIGHT_BACKUP_LOW"]:
+            return _return_step(LOW_BAR_GAIT, "gait_switch_keep_low_return", position, rpy)
+        if _state in RIGHT_LOW_REQUIRED_STATES and y > RIGHT_LOW_START_Y:
+            return _return_step(LOW_BAR_GAIT, "gait_switch_keep_right_low", position, rpy)
         if _state in LOW_STATES:
             return _return_step(LOW_BAR_GAIT, "gait_switch_keep_low", position, rpy)
         return _return_step(0, "gait_switch_wait", position, rpy)

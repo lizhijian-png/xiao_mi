@@ -13,10 +13,10 @@ usergait.toml 步态索引：
   共享（赛段1-4不变）：
     0:站立 1:前进 2:左转 3:右转 4:趴下 9:高抬腿 10:斜坡
     14:快左转 15:快右转 28:快前进 29:左纠偏 30:右纠偏
-  赛段5专用（已加前倾+降重心，并降低抬腿高度避免上坡绊脚）：
-    31:高抬腿(step_h=0.14,pitch=-0.08,z=-0.05) 32:斜坡(step_h=0.10,pitch=-0.05,z=-0.03)
+  赛段5专用（台阶和第一段直坡不下压机身，保留后脚上台阶空间）：
+    31:高抬腿(step_h=0.14,pitch=-0.08,z=-0.05) 32:斜坡(step_h=0.10,pitch=-0.05,z=0.0)
     33:左纠偏(step_h=0.12,pitch=-0.03,z=-0.03) 34:右纠偏(step_h=0.12,pitch=-0.03,z=-0.03)
-    35:上台阶高抬脚(step_h=0.18,pitch=-0.08,z=-0.05)
+    35:上台阶高抬脚(step_h=0.18,pitch=-0.08,z=0.0)
 """
 
 import math
@@ -40,6 +40,7 @@ SEG5_END_Y = 13.35  # SEG5 跳下区结束 (15.35 - 2.0)
 # 台阶位置
 STEP_Y = 7.6       # 台阶在 y=7.6
 STEP_APPROACH_Y = 7.5   # 台阶前切换到爬升步态
+STEP_CLEAR_Y = 8.0      # 台阶后继续保持高抬脚到 y=8.0，给后脚留出完整上台阶距离
 
 # ── 纠偏参数 ──────────────────────────────────────────────────────
 LAT_TOLERANCE = 0.03   # 横向偏移容忍度 3cm（路宽50cm）
@@ -193,9 +194,9 @@ def segment5_control(position, gait_mode, rpy):
             rpy, HDG_YP, CENTER_X_SEG1, x, 'x',
             gait_forward=32, gait_left=33, gait_right=34)
 
-    # ── 翻越台阶：7.5 ≤ y < 7.8 ──────────────────────────────────
+    # ── 翻越台阶：7.5 ≤ y < 8.0，延长高抬脚区间，确保后脚也越过5cm台阶 ───
     elif _state == _ST_SEG1_STEP:
-        if y >= 7.8:
+        if y >= STEP_CLEAR_Y:
             # 台阶翻越完成，站立稳定后进入上坡
             step = _stand_then(_ST_SEG1_UPHILL, 3)
             return step
@@ -203,7 +204,7 @@ def segment5_control(position, gait_mode, rpy):
             rpy, HDG_YP, CENTER_X_SEG1, x, 'x',
             gait_forward=35, gait_left=33, gait_right=34)
 
-    # ── 继续上坡：7.8 ≤ y < 12.10 ────────────────────────────────
+    # ── 继续上坡：8.0 ≤ y < 12.10 ────────────────────────────────
     elif _state == _ST_SEG1_UPHILL:
         if y >= TURN1_EARLY_Y:
             _state = _ST_PRE_TURN1

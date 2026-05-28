@@ -28,10 +28,6 @@ CENTER_X_SEG1 = 3.15    # 分段1、5 中心线 x
 CENTER_Y_SEG2 = 12.35   # 分段2 中心线 y
 CENTER_X_SEG3 = -0.35   # 分段3 中心线 x
 CENTER_Y_SEG4 = 15.35   # 分段4 中心线 y
-UNEVEN_HIGH_BIAS = 0.05  # 不平整路面向高处偏移5cm，用中心线偏置对抗斜坡下滑
-CENTER_Y_SEG2_HIGH = CENTER_Y_SEG2 - UNEVEN_HIGH_BIAS  # 分段2高处在 y 较小侧，目标线向高处偏移
-CENTER_X_SEG3_HIGH = CENTER_X_SEG3 - UNEVEN_HIGH_BIAS  # 分段3高处在 x 较小侧，目标线向高处偏移
-CENTER_Y_SEG4_HIGH = CENTER_Y_SEG4 + UNEVEN_HIGH_BIAS  # 分段4高处在 y 较大侧，目标线向高处偏移
 
 # 连接点（转弯触发位置）
 TURN1_Y = 12.35   # SEG1→SEG2: 到达 y≥12.35 触发左转
@@ -55,6 +51,9 @@ SEG2_LAT_TOLERANCE = 0.015  # 第二段斜坡会把机身推向 y 较大侧，�
 HDG_YP = 90    # y+
 HDG_TURN1_MID = 135  # 第一交接处先从90°转到135°，走约0.2m后再转到180°
 HDG_XN = 180   # x-
+HDG_TURN2_MID = 135  # 第二交接处先从180°转到135°，再转到90°
+HDG_TURN3_MID = 45   # 第三交接处先从90°转到45°，再转到0°
+HDG_TURN4_MID = 315  # 第四交接处先从0°转到315°，再转到270°
 HDG_XP = 0     # x+
 HDG_YN = 270   # y-
 
@@ -254,82 +253,100 @@ def segment5_control(position, gait_mode, rpy):
             # 转到180°后直接进入第二段前进，避免站在倾斜独木桥入口处等待时打滑。
             _state = _ST_SEG2
             return _forward_with_lateral(
-                rpy, HDG_XN, CENTER_Y_SEG2_HIGH, y, 'y',
+                rpy, HDG_XN, CENTER_Y_SEG2, y, 'y',
                 gait_forward=31, gait_left=37, gait_right=38,
                 tolerance=SEG2_LAT_TOLERANCE)
         return step
 
     # ═══════════════════════════════════════════════════════════════
-    # 分段2：x- (180°) 目标线 y=12.30  (向高处偏5cm，对抗向低处下滑)
+    # 分段2：x- (180°) 中心线 y=12.35  (3.15,12.35)→(-0.35,12.35)
     # ═══════════════════════════════════════════════════════════════
     elif _state == _ST_SEG2:
         if x <= TURN2_X:
             _state = _ST_PRE_TURN2
             _stand_count = 0
-            return 0
+            return _turn_step(rpy, HDG_TURN2_MID)
         return _forward_with_lateral(
-            rpy, HDG_XN, CENTER_Y_SEG2_HIGH, y, 'y',
+            rpy, HDG_XN, CENTER_Y_SEG2, y, 'y',
             gait_forward=31, gait_left=37, gait_right=38,
             tolerance=SEG2_LAT_TOLERANCE)
 
-    # ── 转弯前稳定 ──────────────────────────────────────────────
+    # ── 第一次转45°：由180°转到135°，不站立等待，直接衔接第二次45° ─────
     elif _state == _ST_PRE_TURN2:
-        return _stand_then(_ST_TURN2, 5)
+        step = _turn_step(rpy, HDG_TURN2_MID)
+        if step == 0:
+            _state = _ST_TURN2
+            return _turn_step(rpy, HDG_YP)
+        return step
 
-    # ── 右转 180°→90° ───────────────────────────────────────────
+    # ── 第二次转45°：由135°转到90°，转正后直接进入第三段前进 ───────────
     elif _state == _ST_TURN2:
         step = _turn_step(rpy, HDG_YP)
         if step == 0:
             _state = _ST_SEG3
-            return 0
+            return _forward_with_lateral(
+                rpy, HDG_YP, CENTER_X_SEG3, x, 'x',
+                gait_forward=31, gait_left=37, gait_right=38)
         return step
 
     # ═══════════════════════════════════════════════════════════════
-    # 分段3：y+ (90°) 目标线 x=-0.40  (向高处偏5cm，对抗向低处下滑)
+    # 分段3：y+ (90°) 中心线 x=-0.35  (-0.35,12.35)→(-0.35,15.35)
     # ═══════════════════════════════════════════════════════════════
     elif _state == _ST_SEG3:
         if y >= TURN3_Y:
             _state = _ST_PRE_TURN3
             _stand_count = 0
-            return 0
+            return _turn_step(rpy, HDG_TURN3_MID)
         return _forward_with_lateral(
-            rpy, HDG_YP, CENTER_X_SEG3_HIGH, x, 'x',
+            rpy, HDG_YP, CENTER_X_SEG3, x, 'x',
             gait_forward=31, gait_left=37, gait_right=38)
 
-    # ── 转弯前稳定 ──────────────────────────────────────────────
+    # ── 第一次转45°：由90°转到45°，不站立等待，直接衔接第二次45° ──────
     elif _state == _ST_PRE_TURN3:
-        return _stand_then(_ST_TURN3, 5)
+        step = _turn_step(rpy, HDG_TURN3_MID)
+        if step == 0:
+            _state = _ST_TURN3
+            return _turn_step(rpy, HDG_XP)
+        return step
 
-    # ── 右转 90°→0° ────────────────────────────────────────────
+    # ── 第二次转45°：由45°转到0°，转正后直接进入第四段前进 ────────────
     elif _state == _ST_TURN3:
         step = _turn_step(rpy, HDG_XP)
         if step == 0:
             _state = _ST_SEG4
-            return 0
+            return _forward_with_lateral(
+                rpy, HDG_XP, CENTER_Y_SEG4, y, 'y',
+                gait_forward=31, gait_left=37, gait_right=38)
         return step
 
     # ═══════════════════════════════════════════════════════════════
-    # 分段4：x+ (0°) 目标线 y=15.40  (向高处偏5cm，对抗向低处下滑)
+    # 分段4：x+ (0°) 中心线 y=15.35  (-0.35,15.35)→(3.15,15.35)
     # ═══════════════════════════════════════════════════════════════
     elif _state == _ST_SEG4:
         if x >= TURN4_X:
             _state = _ST_PRE_TURN4
             _stand_count = 0
-            return 0
+            return _turn_step(rpy, HDG_TURN4_MID)
         return _forward_with_lateral(
-            rpy, HDG_XP, CENTER_Y_SEG4_HIGH, y, 'y',
+            rpy, HDG_XP, CENTER_Y_SEG4, y, 'y',
             gait_forward=31, gait_left=37, gait_right=38)
 
-    # ── 转弯前稳定 ──────────────────────────────────────────────
+    # ── 第一次转45°：由0°转到315°，不站立等待，直接衔接第二次45° ─────
     elif _state == _ST_PRE_TURN4:
-        return _stand_then(_ST_TURN4, 5)
+        step = _turn_step(rpy, HDG_TURN4_MID)
+        if step == 0:
+            _state = _ST_TURN4
+            return _turn_step(rpy, HDG_YN)
+        return step
 
-    # ── 右转 0°→270° ───────────────────────────────────────────
+    # ── 第二次转45°：由315°转到270°，转正后直接进入第五段前进 ─────────
     elif _state == _ST_TURN4:
         step = _turn_step(rpy, HDG_YN)
         if step == 0:
             _state = _ST_SEG5_FLAT
-            return 0
+            return _forward_with_lateral(
+                rpy, HDG_YN, CENTER_X_SEG1, x, 'x',
+                gait_forward=28, gait_left=33, gait_right=34)
         return step
 
     # ═══════════════════════════════════════════════════════════════

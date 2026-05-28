@@ -41,7 +41,7 @@ RIGHT_LOW_START_Y = 10.00
 # 足球：到 y=11.20 播报，低姿态走到 y=11.40 后开始回退。
 COLA = {"x": LEFT_LANE_X, "y": 11.10, "backup_y": 11.15}
 ORANGE_BALL = {"x": 0.94, "y": 11.00, "backup_y": 11.05}
-FOOTBALL = {"x": RIGHT_LANE_X, "announce_y": 11.20, "backup_y": 11.40}
+FOOTBALL = {"x": RIGHT_LANE_X, "announce_y": 11.20, "backup_y": 11.25}
 
 # 限高杆检测和动作距离参数。
 LEFT_BAR_DETECT_UP_Y = LEFT_BAR["y_min"] - 0.20
@@ -431,17 +431,20 @@ def _detect_target(frame, kind):
 
 
 def _route(position, rpy, frame):
+    """第四段主路线状态机。"""
     global _motion_start, _right_low_start
 
     x, y, _ = position
     _log_event("ROUTE", state=_state, pos=_fmt_pos(position), rpy=f"{rpy:.1f}")
 
+    # 入口：先到第四段起点，再沿 y=7.10m 的底部通道进入最左侧赛道。
     if _state == S["TO_START"]:
         if abs(y - START_POINT[1]) > XY_TOL:
             heading = HEADING_NORTH if START_POINT[1] > y else HEADING_SOUTH
             return _return_step(_forward_step(rpy, heading), "route_to_start_fix_y", position, rpy)
         return _go_x(position, rpy, START_POINT[0], 180, S["LEFT_TO_LANE"], "route_start_reached")
 
+    # 第一段：转入 x=-0.10m 赛道，低姿态过限高杆，偏到 x=0.00m 撞可乐。
     if _state == S["LEFT_TO_LANE"]:
         return _go_x(position, rpy, LEFT_LANE_X, 180, S["LEFT_TURN_UP"], "route_left_lane_reached")
     if _state == S["LEFT_TURN_UP"]:
@@ -466,6 +469,7 @@ def _route(position, rpy, frame):
     if _state == S["LEFT_FIND_COLA"]:
         detected = _detect_target(frame, "cola")
         _log_event("ROUTE_TARGET_SCAN", target="cola", detected=detected, pos=_fmt_pos(position))
+        # 坐标触发兜底：到 y=11.10m 播报可乐，继续到 y=11.15m 后倒退。
         if detected or y >= COLA["y"]:
             _announce_once("cola", "可乐瓶")
         if y >= COLA["backup_y"]:
@@ -493,6 +497,7 @@ def _route(position, rpy, frame):
     if _state == S["LEFT_TURN_EAST"]:
         return _turn_state(rpy, HEADING_EAST, S["MID_TO_LANE"], "route_left_turn_east_done", position)
 
+    # 第二段：先走到 y=8.90m 的换道线，再进入 x=1.00m 赛道寻找橙色小球。
     if _state == S["MID_TO_LANE"]:
         return _go_x(position, rpy, MID_LANE_X, HEADING_EAST, S["MID_TURN_UP"], "route_mid_lane_reached")
     if _state == S["MID_TURN_UP"]:
@@ -502,6 +507,7 @@ def _route(position, rpy, frame):
     if _state == S["MID_FIND_ORANGE"]:
         detected = _detect_target(frame, "orange_ball")
         _log_event("ROUTE_TARGET_SCAN", target="orange_ball", detected=detected, pos=_fmt_pos(position))
+        # 到 y=11.00m 播报小球，继续到 y=11.05m 后倒退，避免目标卡住转身。
         if detected or y >= ORANGE_BALL["y"]:
             _announce_once("orange_ball", "橙色小球")
         if y >= ORANGE_BALL["backup_y"]:
@@ -527,6 +533,7 @@ def _route(position, rpy, frame):
     if _state == S["MID_TURN_EAST"]:
         return _turn_state(rpy, HEADING_EAST, S["RIGHT_TO_LANE"], "route_mid_turn_east_done", position)
 
+    # 第三段：进入 x=2.10m 赛道，y=10.00m 后一直蹲着前进并完成足球射门。
     if _state == S["RIGHT_TO_LANE"]:
         return _go_x(position, rpy, RIGHT_LANE_X, HEADING_EAST, S["RIGHT_TURN_UP"], "route_right_lane_reached")
     if _state == S["RIGHT_TURN_UP"]:
@@ -534,6 +541,7 @@ def _route(position, rpy, frame):
     if _state == S["RIGHT_ALIGN_UP"]:
         return _adjust_x(position, rpy, RIGHT_LANE_X, HEADING_NORTH, S["RIGHT_TO_LOW_START"], "route_right_align_up_done")
     if _state == S["RIGHT_TO_LOW_START"]:
+        # 从 y=10.00m 开始低姿态，后续直到倒退回该位置才站起。
         if y >= RIGHT_LOW_START_Y:
             _right_low_start = [RIGHT_LANE_X, RIGHT_LOW_START_Y]
             _announce_once("right_bar", "限高杆")
@@ -543,6 +551,7 @@ def _route(position, rpy, frame):
     if _state == S["RIGHT_LOW_FORWARD"]:
         detected = _detect_target(frame, "football")
         _log_event("ROUTE_TARGET_SCAN", target="football", detected=detected, pos=_fmt_pos(position))
+        # 到 y=11.20m 播报足球，继续推到 y=11.40m 后低姿态倒退。
         if detected or y >= FOOTBALL["announce_y"]:
             _announce_once("football", "足球")
         if y >= FOOTBALL["backup_y"]:
@@ -566,6 +575,7 @@ def _route(position, rpy, frame):
         _right_low_start = None
         return _adjust_x(position, rpy, RIGHT_LANE_X, HEADING_SOUTH, S["RIGHT_RETURN_Y"], "route_right_align_down_done")
 
+    # 收尾：回到底部通道，再走到独木桥前，让前脚搭上独木桥后结束第四段。
     if _state == S["RIGHT_RETURN_Y"]:
         return _go_y(position, rpy, BRIDGE_SWITCH_POINT[1], HEADING_SOUTH, S["RIGHT_TURN_EAST"], "route_right_return_switch_y_reached")
     if _state == S["RIGHT_TURN_EAST"]:
@@ -585,6 +595,7 @@ def _route(position, rpy, frame):
 
 
 def segment4_control(position, gait_mode, rpy, frame=None):
+    """对外接口：返回当前应执行的步态编号，返回 -1 表示第四段完成。"""
     global _last_log_time, _last_log_signature
 
     x, y, _ = position

@@ -27,6 +27,10 @@ CENTER_X_SEG1 = 3.15    # 分段1、5 中心线 x
 CENTER_Y_SEG2 = 12.35   # 分段2 中心线 y
 CENTER_X_SEG3 = -0.35   # 分段3 中心线 x
 CENTER_Y_SEG4 = 15.35   # 分段4 中心线 y
+UNEVEN_HIGH_BIAS = 0.05  # 不平整路面向高处偏移5cm，用中心线偏置对抗斜坡下滑
+CENTER_Y_SEG2_HIGH = CENTER_Y_SEG2 - UNEVEN_HIGH_BIAS  # 分段2高处在 y 较小侧，目标线向高处偏移
+CENTER_X_SEG3_HIGH = CENTER_X_SEG3 - UNEVEN_HIGH_BIAS  # 分段3高处在 x 较小侧，目标线向高处偏移
+CENTER_Y_SEG4_HIGH = CENTER_Y_SEG4 + UNEVEN_HIGH_BIAS  # 分段4高处在 y 较大侧，目标线向高处偏移
 
 # 连接点（转弯触发位置）
 TURN1_Y = 12.35   # SEG1→SEG2: 到达 y≥12.35 触发左转
@@ -40,7 +44,7 @@ SEG5_END_Y = 13.35  # SEG5 跳下区结束 (15.35 - 2.0)
 # 台阶位置
 STEP_Y = 7.6       # 台阶在 y=7.6
 STEP_APPROACH_Y = 7.3   # 台阶前约30cm切换到高抬脚，避免前脚到 y=7.6 台阶边缘时才开始准备
-STEP_CLEAR_Y = 8.3      # 台阶后继续保持高抬脚到 y=8.3，给后脚留出更完整的上台阶距离
+STEP_CLEAR_Y = 8.5      # 台阶后继续保持高抬脚到 y=8.5，进一步给后脚留出完整上台阶距离
 
 # ── 纠偏参数 ──────────────────────────────────────────────────────
 LAT_TOLERANCE = 0.03   # 横向偏移容忍度 3cm（路宽50cm）
@@ -196,7 +200,7 @@ def segment5_control(position, gait_mode, rpy):
             rpy, HDG_YP, CENTER_X_SEG1, x, 'x',
             gait_forward=32, gait_left=33, gait_right=34)
 
-    # ── 翻越台阶：7.3 ≤ y < 8.3，提前并延长高抬脚区间，确保前后脚都越过5cm台阶 ───
+    # ── 翻越台阶：7.3 ≤ y < 8.5，提前并延长高抬脚区间，确保前后脚都越过5cm台阶 ───
     elif _state == _ST_SEG1_STEP:
         if y >= STEP_CLEAR_Y:
             # 台阶翻越完成，站立稳定后进入上坡
@@ -206,7 +210,7 @@ def segment5_control(position, gait_mode, rpy):
             rpy, HDG_YP, CENTER_X_SEG1, x, 'x',
             gait_forward=35, gait_left=33, gait_right=34)
 
-    # ── 继续上坡：8.3 ≤ y < 12.05 ────────────────────────────────
+    # ── 继续上坡：8.5 ≤ y < 12.05 ────────────────────────────────
     elif _state == _ST_SEG1_UPHILL:
         if y >= TURN1_EARLY_Y:
             _state = _ST_PRE_TURN1
@@ -249,13 +253,13 @@ def segment5_control(position, gait_mode, rpy):
             # 转到180°后直接进入第二段前进，避免站在倾斜独木桥入口处等待时打滑。
             _state = _ST_SEG2
             return _forward_with_lateral(
-                rpy, HDG_XN, CENTER_Y_SEG2, y, 'y',
+                rpy, HDG_XN, CENTER_Y_SEG2_HIGH, y, 'y',
                 gait_forward=31, gait_left=33, gait_right=34,
                 tolerance=SEG2_LAT_TOLERANCE)
         return step
 
     # ═══════════════════════════════════════════════════════════════
-    # 分段2：x- (180°) 中心线 y=12.35  (3.15,12.35)→(-0.35,12.35)
+    # 分段2：x- (180°) 目标线 y=12.30  (向高处偏5cm，对抗向低处下滑)
     # ═══════════════════════════════════════════════════════════════
     elif _state == _ST_SEG2:
         if x <= TURN2_X:
@@ -263,7 +267,7 @@ def segment5_control(position, gait_mode, rpy):
             _stand_count = 0
             return 0
         return _forward_with_lateral(
-            rpy, HDG_XN, CENTER_Y_SEG2, y, 'y',
+            rpy, HDG_XN, CENTER_Y_SEG2_HIGH, y, 'y',
             gait_forward=31, gait_left=33, gait_right=34,
             tolerance=SEG2_LAT_TOLERANCE)
 
@@ -280,7 +284,7 @@ def segment5_control(position, gait_mode, rpy):
         return step
 
     # ═══════════════════════════════════════════════════════════════
-    # 分段3：y+ (90°) 中心线 x=-0.35  (-0.35,12.35)→(-0.35,15.35)
+    # 分段3：y+ (90°) 目标线 x=-0.40  (向高处偏5cm，对抗向低处下滑)
     # ═══════════════════════════════════════════════════════════════
     elif _state == _ST_SEG3:
         if y >= TURN3_Y:
@@ -288,7 +292,7 @@ def segment5_control(position, gait_mode, rpy):
             _stand_count = 0
             return 0
         return _forward_with_lateral(
-            rpy, HDG_YP, CENTER_X_SEG3, x, 'x',
+            rpy, HDG_YP, CENTER_X_SEG3_HIGH, x, 'x',
             gait_forward=31, gait_left=33, gait_right=34)
 
     # ── 转弯前稳定 ──────────────────────────────────────────────
@@ -304,7 +308,7 @@ def segment5_control(position, gait_mode, rpy):
         return step
 
     # ═══════════════════════════════════════════════════════════════
-    # 分段4：x+ (0°) 中心线 y=15.35  (-0.35,15.35)→(3.15,15.35)
+    # 分段4：x+ (0°) 目标线 y=15.40  (向高处偏5cm，对抗向低处下滑)
     # ═══════════════════════════════════════════════════════════════
     elif _state == _ST_SEG4:
         if x >= TURN4_X:
@@ -312,7 +316,7 @@ def segment5_control(position, gait_mode, rpy):
             _stand_count = 0
             return 0
         return _forward_with_lateral(
-            rpy, HDG_XP, CENTER_Y_SEG4, y, 'y',
+            rpy, HDG_XP, CENTER_Y_SEG4_HIGH, y, 'y',
             gait_forward=31, gait_left=33, gait_right=34)
 
     # ── 转弯前稳定 ──────────────────────────────────────────────

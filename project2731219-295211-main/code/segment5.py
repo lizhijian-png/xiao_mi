@@ -17,6 +17,7 @@ usergait.toml 步态索引：
     31:高抬腿(step_h=0.14,pitch=-0.08,z=-0.05) 32:斜坡(step_h=0.10,pitch=-0.05,z=0.0)
     33:左纠偏(step_h=0.12,pitch=-0.03,z=-0.03) 34:右纠偏(step_h=0.12,pitch=-0.03,z=-0.03)
     35:上台阶高抬脚(step_h=0.18,pitch=-0.08,z=0.0)
+    37:不平整路面加强左纠偏(vy=0.08) 38:不平整路面加强右纠偏(vy=-0.08)
 """
 
 import math
@@ -254,7 +255,7 @@ def segment5_control(position, gait_mode, rpy):
             _state = _ST_SEG2
             return _forward_with_lateral(
                 rpy, HDG_XN, CENTER_Y_SEG2_HIGH, y, 'y',
-                gait_forward=31, gait_left=33, gait_right=34,
+                gait_forward=31, gait_left=37, gait_right=38,
                 tolerance=SEG2_LAT_TOLERANCE)
         return step
 
@@ -268,7 +269,7 @@ def segment5_control(position, gait_mode, rpy):
             return 0
         return _forward_with_lateral(
             rpy, HDG_XN, CENTER_Y_SEG2_HIGH, y, 'y',
-            gait_forward=31, gait_left=33, gait_right=34,
+            gait_forward=31, gait_left=37, gait_right=38,
             tolerance=SEG2_LAT_TOLERANCE)
 
     # ── 转弯前稳定 ──────────────────────────────────────────────
@@ -293,7 +294,7 @@ def segment5_control(position, gait_mode, rpy):
             return 0
         return _forward_with_lateral(
             rpy, HDG_YP, CENTER_X_SEG3_HIGH, x, 'x',
-            gait_forward=31, gait_left=33, gait_right=34)
+            gait_forward=31, gait_left=37, gait_right=38)
 
     # ── 转弯前稳定 ──────────────────────────────────────────────
     elif _state == _ST_PRE_TURN3:
@@ -317,7 +318,7 @@ def segment5_control(position, gait_mode, rpy):
             return 0
         return _forward_with_lateral(
             rpy, HDG_XP, CENTER_Y_SEG4_HIGH, y, 'y',
-            gait_forward=31, gait_left=33, gait_right=34)
+            gait_forward=31, gait_left=37, gait_right=38)
 
     # ── 转弯前稳定 ──────────────────────────────────────────────
     elif _state == _ST_PRE_TURN4:

@@ -31,9 +31,9 @@ BRIDGE_SWITCH_POINT = (RIGHT_LANE_X, LANE_SWITCH_Y)
 BRIDGE_APPROACH_POINT = (3.15, LANE_SWITCH_Y)
 SEG5_ENTRY_HEADING = 90
 
-# 左侧限高杆固定在 y=9.40m，低姿态覆盖 y=9.40+-0.40m。
+# 左侧限高杆固定在 y=9.40m，第一段低姿态覆盖 y=9.00m 到 y=10.00m。
 LEFT_BAR = {"x": LEFT_LANE_X, "y": 9.40, "y_min": 9.00, "y_max": 9.80}
-LEFT_BAR_LOW_END_Y = LEFT_BAR["y_max"]
+LEFT_BAR_LOW_END_Y = 10.00
 
 # 右侧第三段限高杆固定在 y=10.40m；y>10.00m 后保持低姿态，回退到 y=10.40m 才站起。
 RIGHT_BAR_Y = 10.40
@@ -50,7 +50,7 @@ FOOTBALL = {"x": RIGHT_LANE_X, "announce_y": 11.10, "backup_y": 11.10}
 
 # 限高杆检测和动作距离参数。
 LEFT_BAR_DETECT_UP_Y = LEFT_BAR["y_min"]
-LEFT_BAR_DETECT_DOWN_Y = LEFT_BAR["y_max"]
+LEFT_BAR_DETECT_DOWN_Y = LEFT_BAR_LOW_END_Y
 BAR_CLEAR_MARGIN = 0.00
 TARGET_BACKUP_DIST = 0.10
 COLA_BACKUP_DIST = 0.15

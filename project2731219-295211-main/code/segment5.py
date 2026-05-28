@@ -30,7 +30,7 @@ CENTER_Y_SEG4 = 15.35   # 分段4 中心线 y
 
 # 连接点（转弯触发位置）
 TURN1_Y = 12.35   # SEG1→SEG2: 到达 y≥12.35 触发左转
-TURN1_EARLY_Y = 12.10  # SEG1→SEG2: 在y=12.10先转45°，避免继续靠右边缘前进
+TURN1_EARLY_Y = 12.00  # SEG1→SEG2: 在y=12.00先转45°，让机身更早远离右侧边缘
 TURN1_FORWARD_DIST = 0.20  # SEG1→SEG2: 第一次45°转完后再实际前进约0.2m，再进入第二次45°转向
 TURN2_X = -0.35   # SEG2→SEG3: 到达 x≤-0.35 触发右转
 TURN3_Y = 15.35   # SEG3→SEG4: 到达 y≥15.35 触发右转
@@ -39,8 +39,8 @@ SEG5_END_Y = 13.35  # SEG5 跳下区结束 (15.35 - 2.0)
 
 # 台阶位置
 STEP_Y = 7.6       # 台阶在 y=7.6
-STEP_APPROACH_Y = 7.5   # 台阶前切换到爬升步态
-STEP_CLEAR_Y = 8.0      # 台阶后继续保持高抬脚到 y=8.0，给后脚留出完整上台阶距离
+STEP_APPROACH_Y = 7.3   # 台阶前约30cm切换到高抬脚，避免前脚到 y=7.6 台阶边缘时才开始准备
+STEP_CLEAR_Y = 8.3      # 台阶后继续保持高抬脚到 y=8.3，给后脚留出更完整的上台阶距离
 
 # ── 纠偏参数 ──────────────────────────────────────────────────────
 LAT_TOLERANCE = 0.03   # 横向偏移容忍度 3cm（路宽50cm）
@@ -185,7 +185,7 @@ def segment5_control(position, gait_mode, rpy):
     # 分段1：y+ (90°) 中心线 x=3.15  (3.15,7.0)→(3.15,12.35)
     # ═══════════════════════════════════════════════════════════════
 
-    # ── 接近台阶：y < 7.5 ────────────────────────────────────────
+    # ── 接近台阶：y < 7.3 ────────────────────────────────────────
     if _state == _ST_SEG1_APPROACH:
         if y >= STEP_APPROACH_Y:
             _state = _ST_SEG1_STEP
@@ -194,7 +194,7 @@ def segment5_control(position, gait_mode, rpy):
             rpy, HDG_YP, CENTER_X_SEG1, x, 'x',
             gait_forward=32, gait_left=33, gait_right=34)
 
-    # ── 翻越台阶：7.5 ≤ y < 8.0，延长高抬脚区间，确保后脚也越过5cm台阶 ───
+    # ── 翻越台阶：7.3 ≤ y < 8.3，提前并延长高抬脚区间，确保前后脚都越过5cm台阶 ───
     elif _state == _ST_SEG1_STEP:
         if y >= STEP_CLEAR_Y:
             # 台阶翻越完成，站立稳定后进入上坡
@@ -204,7 +204,7 @@ def segment5_control(position, gait_mode, rpy):
             rpy, HDG_YP, CENTER_X_SEG1, x, 'x',
             gait_forward=35, gait_left=33, gait_right=34)
 
-    # ── 继续上坡：8.0 ≤ y < 12.10 ────────────────────────────────
+    # ── 继续上坡：8.3 ≤ y < 12.00 ────────────────────────────────
     elif _state == _ST_SEG1_UPHILL:
         if y >= TURN1_EARLY_Y:
             _state = _ST_PRE_TURN1

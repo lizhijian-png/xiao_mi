@@ -31,9 +31,9 @@ BRIDGE_SWITCH_POINT = (RIGHT_LANE_X, LANE_SWITCH_Y)
 BRIDGE_APPROACH_POINT = (3.15, LANE_SWITCH_Y)
 SEG5_ENTRY_HEADING = 90
 
-# 左侧限高杆固定在 y=9.40m，低姿态覆盖 y=9.40+-0.40m。
+# 左侧限高杆固定在 y=9.40m，第一段低姿态覆盖 y=9.00m 到 y=10.00m。
 LEFT_BAR = {"x": LEFT_LANE_X, "y": 9.40, "y_min": 9.00, "y_max": 9.80}
-LEFT_BAR_LOW_END_Y = LEFT_BAR["y_max"]
+LEFT_BAR_LOW_END_Y = 10.00
 
 # 右侧第三段限高杆固定在 y=10.40m；y>10.00m 后保持低姿态，回退到 y=10.40m 才站起。
 RIGHT_BAR_Y = 10.40
@@ -50,7 +50,7 @@ FOOTBALL = {"x": RIGHT_LANE_X, "announce_y": 11.10, "backup_y": 11.10}
 
 # 限高杆检测和动作距离参数。
 LEFT_BAR_DETECT_UP_Y = LEFT_BAR["y_min"]
-LEFT_BAR_DETECT_DOWN_Y = LEFT_BAR["y_max"]
+LEFT_BAR_DETECT_DOWN_Y = LEFT_BAR_LOW_END_Y
 BAR_CLEAR_MARGIN = 0.00
 TARGET_BACKUP_DIST = 0.10
 COLA_BACKUP_DIST = 0.15
@@ -110,6 +110,7 @@ S = {
     "RIGHT_LOW_FORWARD": "S4_RIGHT_LOW_FORWARD",
     "RIGHT_ALIGN_AFTER_BALL": "S4_RIGHT_ALIGN_AFTER_BALL",
     "RIGHT_TURN_BACK_LOW": "S4_RIGHT_TURN_BACK_LOW",
+    "RIGHT_ALIGN_BACK_LOW": "S4_RIGHT_ALIGN_BACK_LOW",
     "RIGHT_BACKUP_LOW": "S4_RIGHT_BACKUP_LOW",
     "RIGHT_STAND": "S4_RIGHT_STAND",
     "RIGHT_TURN_DOWN": "S4_RIGHT_TURN_DOWN",
@@ -127,6 +128,7 @@ LOW_STATES = {
     S["RIGHT_LOW_FORWARD"],
     S["RIGHT_ALIGN_AFTER_BALL"],
     S["RIGHT_TURN_BACK_LOW"],
+    S["RIGHT_ALIGN_BACK_LOW"],
     S["RIGHT_BACKUP_LOW"],
 }
 
@@ -134,6 +136,7 @@ RIGHT_LOW_REQUIRED_STATES = {
     S["RIGHT_LOW_FORWARD"],
     S["RIGHT_ALIGN_AFTER_BALL"],
     S["RIGHT_TURN_BACK_LOW"],
+    S["RIGHT_ALIGN_BACK_LOW"],
     S["RIGHT_BACKUP_LOW"],
 }
 
@@ -628,7 +631,7 @@ def _route_right_lane(position, rpy, frame):
             return _return_step(LOW_BAR_GAIT, "route_football_reach_11_10", position, rpy)
         return _return_step(_forward_step(rpy, HEADING_NORTH, LOW_BAR_GAIT), "route_right_low_forward", position, rpy)
 
-    # 足球到位后先短退 0.10m，再转身，改为低姿态向前走回 y=10.40。
+    # 足球到位后先短退 0.10m，再转身，先纠正回 x=2.10，再低姿态向前走回 y=10.40。
     if _state == S["RIGHT_ALIGN_AFTER_BALL"]:
         if _dist_from_start(position) >= FOOTBALL_BACKUP_AFTER_KICK_DIST:
             _set_state(S["RIGHT_TURN_BACK_LOW"], "route_right_backup_after_ball_done", position)
@@ -638,9 +641,11 @@ def _route_right_lane(position, rpy, frame):
     if _state == S["RIGHT_TURN_BACK_LOW"]:
         step = _turn_to(rpy, HEADING_SOUTH)
         if step == 1:
-            _set_state(S["RIGHT_BACKUP_LOW"], "route_right_turn_back_low_done", position)
+            _set_state(S["RIGHT_ALIGN_BACK_LOW"], "route_right_turn_back_low_done", position)
             return _return_step(LOW_BAR_GAIT, "route_right_turn_back_low_done", position, rpy)
         return _return_step(step, "route_right_turn_back_low_done_turn", position, rpy)
+    if _state == S["RIGHT_ALIGN_BACK_LOW"]:
+        return _adjust_x(position, rpy, RIGHT_LANE_X, HEADING_SOUTH, S["RIGHT_BACKUP_LOW"], "route_right_align_back_x_done")
     if _state == S["RIGHT_BACKUP_LOW"]:
         if _right_low_start is None or y <= _right_low_start[1]:
             _set_state(S["RIGHT_STAND"], "route_right_low_return_to_10_4m_done", position)

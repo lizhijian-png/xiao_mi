@@ -27,6 +27,7 @@ from segment2 import segment2_control, reset_segment2
 from segment3 import segment3_control, reset_segment3
 from segment4 import segment4_control, reset_segment4
 from segment5 import segment5_control, reset_segment5
+from segment6 import segment6_control, reset_segment6
 flags ={
     "ENDING_FLAG1" : False,# 赛段1标志
     "ENDING_FLAG2" : False,# 赛段2标志
@@ -118,21 +119,14 @@ def select_step_based_on_position(position, gait_mode, rpy, frame=None):
                 return 0
             return step
 
-        # 进入S弯回程
-        elif (y>0.5 or (x>1.2 and y>0.1)) and flags["ENDING_FLAG7"] == False:
-            flags["ENDING_FLAG6"] = True
-            return pass_s_back(position,rpy)
+        # 赛段6：撷金建功（角落横移顶球→前推进圈→趴下，整条赛道最后一棒）
+        elif flags["ENDING_FLAG6"] == False:
+            step = segment6_control(position, gait_mode, rpy, frame=frame)
+            if step == -1:
+                flags["ENDING_FLAG6"] = True
+                return 4   # 趴下（segment6 内部已趴下，这里收尾保持趴下）
+            return step
 
-        # 结束
-        elif flags["ENDING_FLAG10"] == False:
-            flags["ENDING_FLAG9"] = True
-            if rpy<175:
-                return 19
-            elif x>-0.15 :
-                return walk_180(rpy)
-            else:
-                flags["ENDING_FLAG10"] = True
-                return 4
         else:
             return 4
         
@@ -479,6 +473,7 @@ def main():
         reset_segment3()
         reset_segment4()
         reset_segment5()
+        reset_segment6()
         my_ctrl = Robot_Ctrl()
         pos_msg = Pos_msg(data_lock)
         gait_msg = Gait_msg(data_lock)

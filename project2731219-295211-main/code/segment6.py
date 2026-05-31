@@ -108,15 +108,22 @@ def _arrived(cur, target):
 
 
 def detect_ball(frame):
-    """视觉钩子（默认关闭）：返回球相对机身的横向偏移（像素，正=偏右）。
+    """识别相机帧中足球，返回球心相对画面中心的横向像素偏移（正=偏右）。
 
-    与赛段1 detect_yellow_line_offset 处理一致：主控默认传 frame=None，
-    此时直接返回 0.0，控制走纯里程计。现场需要纠偏时再接入 HSV+圆检测，
-    无需改 segment6_control 签名。真实实现见 Task 3（默认仍关闭）。
+    默认主控传 frame=None → 返回 0.0，走纯里程计（确定性优先）。
+    现场需纠偏时传入真实帧：HSV 阈值分割足球颜色 + 最小外接圆求球心 u。
     """
     if frame is None:
         return 0.0
-    return 0.0
+    import cv2, numpy as np
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    # 足球颜色阈值现场标定（此处示意白色，需按实际球色调整）
+    mask = cv2.inRange(hsv, np.array([0, 0, 200]), np.array([180, 40, 255]))
+    cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not cnts:
+        return 0.0
+    (u, _v), _r = cv2.minEnclosingCircle(max(cnts, key=cv2.contourArea))
+    return float(u - frame.shape[1] / 2.0)   # 正=球偏右
 
 
 def segment6_control(position, gait_mode, rpy, frame=None):
@@ -200,6 +207,48 @@ def segment6_control(position, gait_mode, rpy, frame=None):
         return _walk(rpy, HDG_PUSH, G_KICK)
 
     # ── H：圈内趴下，计3帧后完成 ──
+    elif _state == _ST_H_LAYDOWN:
+        _laydown_count += 1
+        if _laydown_count >= 3:
+            _state = _ST_DONE
+            return -1
+        return G_LAY
+
+    elif _state == _ST_DONE:
+        return -1
+
+    return -1
+
+
+def _kick_fallback_control(x, y, rpy):
+    """踢球退路：角落外对准328°→快步态踢射→追球进圈→趴下。
+
+    复用主线朝向/步态/状态骨架，去掉 C/D 倒退环节。
+    倒顶若仿真反复顶不到球/顶歪时，置 USE_KICK_FALLBACK=True 启用。
+    收尾复用主线 _ST_H_LAYDOWN / _ST_DONE。
+    """
+    global _state, _laydown_count
+
+    # 退路首帧（_state 仍是 reset 后的 _ST_A_GO_TOP）→ 切入对准态
+    if _state == _ST_A_GO_TOP:
+        _state = _ST_K_AIM
+
+    # ── K_AIM：原地转到328°（对准缺口）──
+    if _state == _ST_K_AIM:
+        ts = _turn_step(rpy, HDG_PUSH)
+        if ts != 0:
+            return ts
+        _state = _ST_K_KICK
+        return G_KICK
+
+    # ── K_KICK：快步态踢/推球过缺口，狗随球进圈（锁328°）──
+    elif _state == _ST_K_KICK:
+        if x >= FINISH_STOP_X:
+            _state = _ST_H_LAYDOWN
+            return G_STAND
+        return _walk(rpy, HDG_PUSH, G_KICK)
+
+    # ── 收尾复用主线趴下（H/DONE 也由 segment6_control 处理）──
     elif _state == _ST_H_LAYDOWN:
         _laydown_count += 1
         if _laydown_count >= 3:

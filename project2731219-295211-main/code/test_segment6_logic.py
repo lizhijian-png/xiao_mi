@@ -130,3 +130,35 @@ def test_DONE_returns_minus1_even_when_mode7():
     s6._state = s6._ST_DONE
     step = s6.segment6_control([s6.FINISH_CX, s6.FINISH_CY, 0.0], [0, 7], s6.HDG_PUSH)
     assert step == -1 and s6._state == s6._ST_DONE
+
+
+def test_kick_fallback_aims_then_kicks():
+    s6.reset_segment6()
+    s6.USE_KICK_FALLBACK = True
+    try:
+        # 退路首帧：未对准328° → 先转向，状态切到 K_AIM
+        step = s6.segment6_control([0.9, 14.2, 0.0], [11, 0], 270)
+        assert step == s6._turn_step(270, s6.HDG_PUSH)
+        assert s6._state == s6._ST_K_AIM
+        # 已对准328° → 进入踢射，发快步态
+        step = s6.segment6_control([0.9, 14.2, 0.0], [11, 0], s6.HDG_PUSH)
+        assert step == s6.G_KICK and s6._state == s6._ST_K_KICK
+    finally:
+        s6.USE_KICK_FALLBACK = False
+        s6.reset_segment6()
+
+
+def test_kick_fallback_chases_into_circle_then_lays():
+    s6.reset_segment6()
+    s6.USE_KICK_FALLBACK = True
+    try:
+        s6._state = s6._ST_K_KICK
+        # 未到圈心x → 继续追球快步态
+        step = s6.segment6_control([2.0, 13.4, 0.0], [11, 0], s6.HDG_PUSH)
+        assert step == s6.G_KICK and s6._state == s6._ST_K_KICK
+        # 到圈心x → 进入趴下
+        step = s6.segment6_control([s6.FINISH_STOP_X, 12.85, 0.0], [11, 0], s6.HDG_PUSH)
+        assert step == s6.G_STAND and s6._state == s6._ST_H_LAYDOWN
+    finally:
+        s6.USE_KICK_FALLBACK = False
+        s6.reset_segment6()

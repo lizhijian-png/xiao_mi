@@ -49,9 +49,9 @@ G_LAY    = 4     # 趴下
 G_BACK_SLOW, G_BACK  = 6, 26      # 后退 -0.10 / -0.20
 G_FTURN_L, G_FTURN_R = 14, 15     # 快转 ±0.60
 G_KICK   = 28    # 快前进0.30
-G_PUSH   = 43    # 推球低重心前进0.20
-G_SWEEP_L = 44   # 低重心左横移 vel_y+0.08、posZ-0.12（D1 扫球出角）
-G_SWEEP_R = 45   # 低重心右横移 vel_y-0.10、posZ-0.12（D2 退开拉间隙）
+G_PUSH   = 45    # 推球低重心前进0.20（合并队友跳跃步态后下标43/44被占，顺移到45）
+G_SWEEP_L = 46   # 低重心左横移 vel_y+0.08、posZ-0.05（D1 扫球出角）
+G_SWEEP_R = 47   # 低重心右横移 vel_y-0.10（D2 退开拉间隙）
 
 # ── 踢球退路开关（倒顶若仿真失败，置 True 切踢射方案）──
 USE_KICK_FALLBACK = False
@@ -231,7 +231,7 @@ def segment6_control(position, gait_mode, rpy, frame=None):
         return _walk(rpy, HDG_PUSH, G_PUSH)
 
     # ── G：保持低重心推球穿缝，狗随球进圈（不留余量，确保后脚进缺口）──
-    # 用 G_PUSH(43, posZ=-0.08 全表最低) 全程压住球，避免高步态(28)抬高机身致球从身下漏走。
+    # 用 G_PUSH(45, posZ=-0.08 全表最低) 全程压住球，避免高步态(28)抬高机身致球从身下漏走。
     elif _state == _ST_G_THROUGH_GAP:
         if x >= FINISH_STOP_X:
             _state = _ST_TURN_FINISH

@@ -700,3 +700,19 @@ foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
 step_height = [ 0.02, 0.02,]
 value = 0
 duration = 0
+
+#53 赛段6角落横移专用：低重心左横移（重心降0.08，侧速+0.08，把球顶出角落）
+[[step]]
+mode = 11
+gait_id = 27
+contact = 15
+life_count = 0
+vel_des = [ 0.0, 0.08, 0.0,]
+rpy_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, -0.08,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.02, 0.02,]
+value = 0
+duration = 0

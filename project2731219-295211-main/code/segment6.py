@@ -37,6 +37,7 @@ HDG_UP      = 90    # A 朝向：+y 上行
 HDG_LEFT    = 180   # B 朝向：-x 左行
 HDG_HEAD_IN = 148   # C 目标头朝向：扎进左上角（尾朝328°对准缺口）
 HDG_PUSH    = 328   # E/F/G 头朝向：球→缺口→圈心方向（atan2(-1.65,2.65)≈-31.9°→328.1°）
+HDG_FINISH  = 0     # 终点圈内趴下前转身朝向：正对 +x
 FAST_DEG, SLOW_DEG = 20, 8
 
 # ── 步态下标（toml 实测，按数组下标取）──
@@ -59,7 +60,8 @@ _ST_C_AIM_TAIL    = "C_AIM_TAIL"     # 转头到148°（尾朝328°对准缺口�
 _ST_D_NUDGE       = "D_NUDGE"        # 后退步态让后体扫过球，把球沿328°顶出角落
 _ST_E_FACE_PUSH   = "E_FACE_PUSH"    # 原地转身头朝328°正对被顶出的球
 _ST_F_DRIBBLE     = "F_DRIBBLE"      # 锁328°低重心前推带球到缺口前
-_ST_G_THROUGH_GAP = "G_THROUGH_GAP"  # 换快步态送球穿缝，狗随球进圈
+_ST_G_THROUGH_GAP = "G_THROUGH_GAP"  # 低重心推球穿缝，狗随球进圈
+_ST_TURN_FINISH   = "TURN_FINISH"    # 圈内原地转身，头从328°转到正对+x(0°)
 _ST_H_LAYDOWN     = "H_LAYDOWN"      # 圈内趴下
 _ST_DONE          = "DONE"
 # 踢球退路状态（USE_KICK_FALLBACK=True 时启用，收尾复用 H/DONE）
@@ -196,15 +198,24 @@ def segment6_control(position, gait_mode, rpy, frame=None):
     elif _state == _ST_F_DRIBBLE:
         if x >= KICK_TRIGGER_X:
             _state = _ST_G_THROUGH_GAP
-            return G_KICK
+            return G_PUSH
         return _walk(rpy, HDG_PUSH, G_PUSH)
 
-    # ── G：换快步态送球穿缝，狗随球进圈（不留余量，确保后脚进缺口）──
+    # ── G：保持低重心推球穿缝，狗随球进圈（不留余量，确保后脚进缺口）──
+    # 用 G_PUSH(43, posZ=-0.08 全表最低) 全程压住球，避免高步态(28)抬高机身致球从身下漏走。
     elif _state == _ST_G_THROUGH_GAP:
         if x >= FINISH_STOP_X:
-            _state = _ST_H_LAYDOWN
+            _state = _ST_TURN_FINISH
             return G_STAND
-        return _walk(rpy, HDG_PUSH, G_KICK)
+        return _walk(rpy, HDG_PUSH, G_PUSH)
+
+    # ── TURN_FINISH：圈内原地转身，头从328°转到正对+x(0°)，对准后进趴下 ──
+    elif _state == _ST_TURN_FINISH:
+        ts = _turn_step(rpy, HDG_FINISH)
+        if ts != 0:
+            return ts
+        _state = _ST_H_LAYDOWN
+        return G_STAND
 
     # ── H：圈内趴下，计3帧后完成 ──
     elif _state == _ST_H_LAYDOWN:
@@ -244,9 +255,17 @@ def _kick_fallback_control(x, y, rpy):
     # ── K_KICK：快步态踢/推球过缺口，狗随球进圈（锁328°）──
     elif _state == _ST_K_KICK:
         if x >= FINISH_STOP_X:
-            _state = _ST_H_LAYDOWN
+            _state = _ST_TURN_FINISH
             return G_STAND
         return _walk(rpy, HDG_PUSH, G_KICK)
+
+    # ── TURN_FINISH：圈内原地转身头朝+x(0°)，对准后进趴下（与主线同形）──
+    elif _state == _ST_TURN_FINISH:
+        ts = _turn_step(rpy, HDG_FINISH)
+        if ts != 0:
+            return ts
+        _state = _ST_H_LAYDOWN
+        return G_STAND
 
     # ── 收尾趴下：本函数自带 H/DONE 副本完成计数（主控仅贡献等待判据对 H/DONE 的豁免）──
     elif _state == _ST_H_LAYDOWN:

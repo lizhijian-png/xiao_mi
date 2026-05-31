@@ -93,23 +93,41 @@ def test_E_face_push_turns_to_328_then_F():
     assert st == s6._ST_F_DRIBBLE and step == s6.G_PUSH
 
 
-def test_F_dribble_then_G_kick_trigger():
+def test_F_dribble_then_G_keeps_low_push():
     s6.reset_segment6()
     s6._state = s6._ST_F_DRIBBLE
     step, st = _drive((2.0, 13.5), s6.HDG_PUSH)
     assert step == s6.G_PUSH and st == s6._ST_F_DRIBBLE
+    # 进入穿缝阶段仍发低重心推球步态(43)，不再切高步态(28)——防球从身下漏走
     step, st = _drive((s6.KICK_TRIGGER_X, 13.2), s6.HDG_PUSH)
-    assert st == s6._ST_G_THROUGH_GAP and step == s6.G_KICK
+    assert st == s6._ST_G_THROUGH_GAP and step == s6.G_PUSH
 
 
-def test_G_through_gap_then_H_then_done():
+def test_G_through_gap_keeps_low_push_then_turn_finish():
     s6.reset_segment6()
     s6._state = s6._ST_G_THROUGH_GAP
+    # 穿缝途中仍用低重心推球步态(43)压住球，不换高步态(28)
+    step, st = _drive((2.6, 13.0), s6.HDG_PUSH)
+    assert step == s6.G_PUSH and st == s6._ST_G_THROUGH_GAP
+    # 到圈心x → 进入转身阶段（不再直接趴下）
     step, st = _drive((s6.FINISH_STOP_X, 12.85), s6.HDG_PUSH)
+    assert st == s6._ST_TURN_FINISH and step == s6.G_STAND
+
+
+def test_turn_finish_turns_to_plus_x_then_laydown_then_done():
+    s6.reset_segment6()
+    s6._state = s6._ST_TURN_FINISH
+    # 还朝328° → 先转向对准+x(0°)，不进趴下
+    step, st = _drive((s6.FINISH_CX, s6.FINISH_CY), s6.HDG_PUSH)
+    assert step == s6._turn_step(s6.HDG_PUSH, s6.HDG_FINISH) and st == s6._ST_TURN_FINISH
+    assert step != 0   # 328°离0°有32°，确实需要转
+    # 已对准+x → 进趴下
+    step, st = _drive((s6.FINISH_CX, s6.FINISH_CY), s6.HDG_FINISH)
     assert st == s6._ST_H_LAYDOWN and step == s6.G_STAND
+    # 趴下计数到 DONE
     last = None
     for _ in range(4):
-        last, st = _drive((s6.FINISH_CX, s6.FINISH_CY), s6.HDG_PUSH)
+        last, st = _drive((s6.FINISH_CX, s6.FINISH_CY), s6.HDG_FINISH)
     assert last == -1 and st == s6._ST_DONE
 
 
@@ -156,13 +174,19 @@ def test_kick_fallback_chases_into_circle_then_lays():
         # 未到圈心x → 继续追球快步态
         step = s6.segment6_control([2.0, 13.4, 0.0], [11, 0], s6.HDG_PUSH)
         assert step == s6.G_KICK and s6._state == s6._ST_K_KICK
-        # 到圈心x → 进入趴下
+        # 到圈心x → 进入转身阶段（与主线同形，先转身再趴下）
         step = s6.segment6_control([s6.FINISH_STOP_X, 12.85, 0.0], [11, 0], s6.HDG_PUSH)
+        assert step == s6.G_STAND and s6._state == s6._ST_TURN_FINISH
+        # 还朝328° → 转身对准+x(0°)
+        step = s6.segment6_control([s6.FINISH_CX, s6.FINISH_CY, 0.0], [11, 0], s6.HDG_PUSH)
+        assert step == s6._turn_step(s6.HDG_PUSH, s6.HDG_FINISH) and s6._state == s6._ST_TURN_FINISH
+        # 对准+x → 进趴下
+        step = s6.segment6_control([s6.FINISH_CX, s6.FINISH_CY, 0.0], [11, 0], s6.HDG_FINISH)
         assert step == s6.G_STAND and s6._state == s6._ST_H_LAYDOWN
         # 趴下计数：本函数自带 H/DONE 副本，驱动到 DONE 返回 -1（防与主线漂移）
         last = None
         for _ in range(3):
-            last = s6.segment6_control([s6.FINISH_CX, s6.FINISH_CY, 0.0], [11, 0], s6.HDG_PUSH)
+            last = s6.segment6_control([s6.FINISH_CX, s6.FINISH_CY, 0.0], [11, 0], s6.HDG_FINISH)
         assert last == -1 and s6._state == s6._ST_DONE
     finally:
         s6.USE_KICK_FALLBACK = False

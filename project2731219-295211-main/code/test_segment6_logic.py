@@ -40,6 +40,15 @@ def test_arrived_within_tol():
     assert s6._arrived(0.20, 0.40) is False
 
 
+def test_dist_euclidean():
+    assert s6._dist(0.0, 0.0, 0.0, 0.0) == 0.0
+    assert s6._dist(3.0, 0.0, 0.0, 0.0) == 3.0
+    assert s6._dist(0.0, 4.0, 0.0, 0.0) == 4.0
+    assert abs(s6._dist(3.0, 4.0, 0.0, 0.0) - 5.0) < 1e-9
+    # 与 SWEEP_DIST 阈值同量级：走0.20m 恰好达阈
+    assert abs(s6._dist(0.20, 14.50, 0.0, 14.50) - 0.20) < 1e-9
+
+
 def _drive(pos, yaw, gait_mode=(11, 0)):
     """跑一帧，返回 (步态, 推进后的状态名)。"""
     step = s6.segment6_control(list(pos), list(gait_mode), yaw)

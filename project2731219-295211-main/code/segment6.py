@@ -109,6 +109,11 @@ def _arrived(cur, target):
     return abs(cur - target) <= XY_TOL
 
 
+def _dist(x, y, x0, y0):
+    """两点欧氏距离，横移位移判据用。"""
+    return ((x - x0) ** 2 + (y - y0) ** 2) ** 0.5
+
+
 def detect_ball(frame):
     """识别相机帧中足球，返回球心相对画面中心的横向像素偏移（正=偏右）。
 

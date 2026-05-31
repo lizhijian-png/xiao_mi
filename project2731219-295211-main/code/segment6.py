@@ -52,9 +52,19 @@ G_PUSH   = 43    # 推球低重心前进0.20
 # ── 踢球退路开关（倒顶若仿真失败，置 True 切踢射方案）──
 USE_KICK_FALLBACK = False
 
-# 状态常量占位（Task 2 替换为完整八阶段）：reset_segment6 引用 _ST_A_GO_TOP，
-# 先占位定义避免 import 失败；Task 1 测试只调辅助函数，不触达状态机。
-_ST_A_GO_TOP = "A_GO_TOP"
+# ── 状态机状态（八阶段）──
+_ST_A_GO_TOP      = "A_GO_TOP"       # 转90°贴右墙上行到顶墙
+_ST_B_GO_CORNER   = "B_GO_CORNER"    # 转180°贴顶墙左行到左上角（两墙自定位）
+_ST_C_AIM_TAIL    = "C_AIM_TAIL"     # 转头到148°（尾朝328°对准缺口）
+_ST_D_NUDGE       = "D_NUDGE"        # 后退步态让后体扫过球，把球沿328°顶出角落
+_ST_E_FACE_PUSH   = "E_FACE_PUSH"    # 原地转身头朝328°正对被顶出的球
+_ST_F_DRIBBLE     = "F_DRIBBLE"      # 锁328°低重心前推带球到缺口前
+_ST_G_THROUGH_GAP = "G_THROUGH_GAP"  # 换快步态送球穿缝，狗随球进圈
+_ST_H_LAYDOWN     = "H_LAYDOWN"      # 圈内趴下
+_ST_DONE          = "DONE"
+# 踢球退路状态（USE_KICK_FALLBACK=True 时启用，收尾复用 H/DONE）
+_ST_K_AIM  = "K_AIM"    # 角落外对准缺口方向 328°
+_ST_K_KICK = "K_KICK"   # 快步态把球踢/推过缺口，狗随球进圈
 
 
 # ── 状态机全局变量 ──
@@ -107,3 +117,97 @@ def detect_ball(frame):
     if frame is None:
         return 0.0
     return 0.0
+
+
+def segment6_control(position, gait_mode, rpy, frame=None):
+    """赛段6控制，每帧(~0.2s)调用。返回步态下标；-1=完成。
+
+    position: [x,y,z] 来自 Pos_msg.position（兼容 [x,y]，忽略 z）
+    gait_mode: [gait_id, mode] 来自 Gait_msg.gait_mode
+    rpy: float 机身朝向角(°) 来自 Pos_msg.rpy[2]
+    frame: 相机帧或 None（视觉钩子，默认关闭）
+    """
+    global _state, _laydown_count
+    x, y = position[0], position[1]
+    gait, mode = gait_mode
+
+    # 步态切换中/趴下中等待，避免重复发指令打断动作（与赛段5一致）。
+    # H_LAYDOWN / DONE 例外：H 让趴下帧计数确定性推进到 DONE（否则 G_LAY 发出后
+    # mode 变7会被此判据锁死，计数卡在1、趴下↔站立抖动）；DONE 是终止态须无条件
+    # 返回 -1（否则趴下中 mode==7 会把 -1 拦成 G_STAND，赛段永不报完成）。
+    if _state not in (_ST_H_LAYDOWN, _ST_DONE) and (
+        (gait == 0 and mode == 0) or (gait == 1 and mode == 9) or mode == 7
+    ):
+        return G_STAND
+
+    _ = detect_ball(frame)   # 视觉钩子，默认 frame=None 返回 0，不影响里程计主控
+
+    if USE_KICK_FALLBACK:
+        return _kick_fallback_control(x, y, rpy)   # Task 3 定义
+
+    # ── A：转90°贴右墙上行到顶墙 ──
+    if _state == _ST_A_GO_TOP:
+        if y >= TOP_Y:
+            _state = _ST_B_GO_CORNER
+            return G_STAND
+        return _walk(rpy, HDG_UP, G_NAV)
+
+    # ── B：转180°贴顶墙左行到左上角（左墙挡停，两墙自定位）──
+    elif _state == _ST_B_GO_CORNER:
+        if x <= CORNER_X:
+            _state = _ST_C_AIM_TAIL
+            return G_STAND
+        return _walk(rpy, HDG_LEFT, G_NAV)
+
+    # ── C：转头到148°（尾朝328°对准缺口）──
+    elif _state == _ST_C_AIM_TAIL:
+        ts = _turn_step(rpy, HDG_HEAD_IN)
+        if ts != 0:
+            return ts
+        _state = _ST_D_NUDGE
+        return G_BACK
+
+    # ── D：后退步态让后体扫过球，把球沿328°顶出角落 ──
+    elif _state == _ST_D_NUDGE:
+        if x >= NUDGE_EXIT_X:
+            _state = _ST_E_FACE_PUSH
+            return G_STAND
+        ts = _turn_step(rpy, HDG_HEAD_IN)   # 保持头朝148°，漂移先转回再退
+        if ts != 0:
+            return ts
+        return G_BACK
+
+    # ── E：原地转身头朝328°正对被顶出的球 ──
+    elif _state == _ST_E_FACE_PUSH:
+        ts = _turn_step(rpy, HDG_PUSH)
+        if ts != 0:
+            return ts
+        _state = _ST_F_DRIBBLE
+        return G_PUSH
+
+    # ── F：锁328°低重心前推，带球到缺口前 ──
+    elif _state == _ST_F_DRIBBLE:
+        if x >= KICK_TRIGGER_X:
+            _state = _ST_G_THROUGH_GAP
+            return G_KICK
+        return _walk(rpy, HDG_PUSH, G_PUSH)
+
+    # ── G：换快步态送球穿缝，狗随球进圈（不留余量，确保后脚进缺口）──
+    elif _state == _ST_G_THROUGH_GAP:
+        if x >= FINISH_STOP_X:
+            _state = _ST_H_LAYDOWN
+            return G_STAND
+        return _walk(rpy, HDG_PUSH, G_KICK)
+
+    # ── H：圈内趴下，计3帧后完成 ──
+    elif _state == _ST_H_LAYDOWN:
+        _laydown_count += 1
+        if _laydown_count >= 3:
+            _state = _ST_DONE
+            return -1
+        return G_LAY
+
+    elif _state == _ST_DONE:
+        return -1
+
+    return -1

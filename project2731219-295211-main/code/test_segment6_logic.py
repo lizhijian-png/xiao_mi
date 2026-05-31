@@ -9,11 +9,14 @@ def test_norm_wraps_to_pm180():
     assert s6._norm(-190) == 170
     assert s6._norm(360) == 0
     assert s6._norm(0) == 0
+    assert s6._norm(180) == 180
+    assert s6._norm(-180) == 180
 
 
 def test_turn_step_aligned_returns_zero():
     assert s6._turn_step(328, 328) == 0
     assert s6._turn_step(328 + s6.SLOW_DEG - 1, 328) == 0
+    assert s6._turn_step(328 + s6.SLOW_DEG, 328) == 0
 
 
 def test_turn_step_picks_direction_and_speed():
@@ -23,6 +26,8 @@ def test_turn_step_picks_direction_and_speed():
     # 朝向偏小(需左转)
     assert s6._turn_step(328 - s6.FAST_DEG - 5, 328) == s6.G_FTURN_L
     assert s6._turn_step(328 - s6.SLOW_DEG - 2, 328) == s6.G_TURN_L
+    assert s6._turn_step(328 + s6.FAST_DEG, 328) == s6.G_TURN_R
+    assert s6._turn_step(328 - s6.FAST_DEG, 328) == s6.G_TURN_L
 
 
 def test_walk_turns_first_then_advances():

@@ -45,7 +45,7 @@ def test_dist_euclidean():
     assert s6._dist(3.0, 0.0, 0.0, 0.0) == 3.0
     assert s6._dist(0.0, 4.0, 0.0, 0.0) == 4.0
     assert abs(s6._dist(3.0, 4.0, 0.0, 0.0) - 5.0) < 1e-9
-    # 与 SWEEP_DIST 阈值同量级：走0.20m 恰好达阈
+    # 与 SWEEP_L_DIST 阈值同量级：走0.20m 恰好达阈
     assert abs(s6._dist(0.20, 14.50, 0.0, 14.50) - 0.20) < 1e-9
 
 
@@ -81,23 +81,39 @@ def test_C_aim_sweep_turns_to_225_then_D():
     # 未对准225° → 先转向，状态留在 C
     step, st = _drive((0.20, 14.95), 180)
     assert step == s6._turn_step(180, s6.HDG_SWEEP) and st == s6._ST_C_AIM_SWEEP
-    # 对准225° → 进 D，首发低重心横移步态
+    # 对准225° → 进 D1，首发低重心左横移步态
     step, st = _drive((0.20, 14.95), s6.HDG_SWEEP)
-    assert st == s6._ST_D_SWEEP and step == s6.G_SWEEP
+    assert st == s6._ST_D1_SWEEP and step == s6.G_SWEEP_L
 
 
-def test_D_sweep_moves_then_E():
+def test_D1_sweep_left_then_D2():
     s6.reset_segment6()
-    s6._state = s6._ST_D_SWEEP
-    # 进 D 首帧记起点(0.20,14.95)，位移0 < SWEEP_DIST → 持续发横移
+    s6._state = s6._ST_D1_SWEEP
+    # 进 D1 首帧记起点(0.20,14.95)，位移0 < SWEEP_L_DIST → 持续发低重心左移
     step, st = _drive((0.20, 14.95), s6.HDG_SWEEP)
-    assert step == s6.G_SWEEP and st == s6._ST_D_SWEEP
+    assert step == s6.G_SWEEP_L and st == s6._ST_D1_SWEEP
     assert s6._sweep_x0 == 0.20 and s6._sweep_y0 == 14.95
-    # 位移仍不足 → 继续横移
+    # 位移仍不足 → 继续左移
     step, st = _drive((0.28, 14.85), s6.HDG_SWEEP)
-    assert step == s6.G_SWEEP and st == s6._ST_D_SWEEP
-    # 位移≥SWEEP_DIST(从起点(0.20,14.95)走 hypot(0.16,0.16)=0.226m≥0.20) → 进 E，发站立
-    step, st = _drive((0.36, 14.79), s6.HDG_SWEEP)
+    assert step == s6.G_SWEEP_L and st == s6._ST_D1_SWEEP
+    # 位移≥SWEEP_L_DIST(从(0.20,14.95)走 hypot(0.20,0.20)=0.283≥0.25) → 置 D2、起点清空、发右移
+    step, st = _drive((0.40, 14.75), s6.HDG_SWEEP)
+    assert st == s6._ST_D2_CLEAR and step == s6.G_SWEEP_R
+    assert s6._sweep_x0 is None and s6._sweep_y0 is None
+
+
+def test_D2_clear_right_then_E():
+    s6.reset_segment6()
+    s6._state = s6._ST_D2_CLEAR
+    # 进 D2 首帧记起点(0.40,14.75)（reset 已清 None），位移0 < SWEEP_R_DIST → 发右移
+    step, st = _drive((0.40, 14.75), s6.HDG_SWEEP)
+    assert step == s6.G_SWEEP_R and st == s6._ST_D2_CLEAR
+    assert s6._sweep_x0 == 0.40 and s6._sweep_y0 == 14.75
+    # 位移仍不足 → 继续右移
+    step, st = _drive((0.34, 14.80), s6.HDG_SWEEP)
+    assert step == s6.G_SWEEP_R and st == s6._ST_D2_CLEAR
+    # 位移≥SWEEP_R_DIST(从(0.40,14.75)走 hypot(0.13,0.10)=0.164≥0.15) → 进 E，发站立
+    step, st = _drive((0.27, 14.85), s6.HDG_SWEEP)
     assert st == s6._ST_E_FACE_PUSH and step == s6.G_STAND
 
 

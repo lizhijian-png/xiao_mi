@@ -35,7 +35,8 @@ XY_TOL = 0.08          # 航点到达容差
 HDG_UP      = 90    # A 朝向：+y 上行
 HDG_LEFT    = 180   # B 朝向：-x 左行
 HDG_SWEEP   = 225   # C 目标头朝向：逆时针转到左下方（左侧身体朝右下顶球）
-SWEEP_DIST  = 0.20  # D 退出：横移里程位移阈值（约20cm）
+SWEEP_L_DIST = 0.25  # D1 退出：左扫里程位移阈值（把球扫出角落，约25cm）
+SWEEP_R_DIST = 0.15  # D2 退出：右退里程位移阈值（拉开间隙便于转身不碰球，约15cm）
 HDG_PUSH    = 328   # E/F/G 头朝向：球→缺口→圈心方向（atan2(-1.65,2.65)≈-31.9°→328.1°）
 HDG_FINISH  = 0     # 终点圈内趴下前转身朝向：正对 +x
 FAST_DEG, SLOW_DEG = 20, 8
@@ -49,7 +50,8 @@ G_BACK_SLOW, G_BACK  = 6, 26      # 后退 -0.10 / -0.20
 G_FTURN_L, G_FTURN_R = 14, 15     # 快转 ±0.60
 G_KICK   = 28    # 快前进0.30
 G_PUSH   = 43    # 推球低重心前进0.20
-G_SWEEP  = 44    # 低重心左横移 vel_y+0.08、posZ-0.08（D 段顶球）
+G_SWEEP_L = 44   # 低重心左横移 vel_y+0.08、posZ-0.12（D1 扫球出角）
+G_SWEEP_R = 45   # 低重心右横移 vel_y-0.10、posZ-0.12（D2 退开拉间隙）
 
 # ── 踢球退路开关（倒顶若仿真失败，置 True 切踢射方案）──
 USE_KICK_FALLBACK = False
@@ -58,7 +60,8 @@ USE_KICK_FALLBACK = False
 _ST_A_GO_TOP      = "A_GO_TOP"       # 转90°贴右墙上行到顶墙
 _ST_B_GO_CORNER   = "B_GO_CORNER"    # 转180°贴顶墙左行到左上角（两墙自定位）
 _ST_C_AIM_SWEEP   = "C_AIM_SWEEP"    # 转头到225°（左侧身体朝右下对球）
-_ST_D_SWEEP       = "D_SWEEP"        # 低重心左横移，把球顶出角落
+_ST_D1_SWEEP      = "D1_SWEEP"       # 低重心左横移，把球顶出角落
+_ST_D2_CLEAR      = "D2_CLEAR"       # 低重心右横移，退开拉间隙便于转身不碰球
 _ST_E_FACE_PUSH   = "E_FACE_PUSH"    # 原地转身头朝328°正对被顶出的球
 _ST_F_DRIBBLE     = "F_DRIBBLE"      # 锁328°低重心前推带球到缺口前
 _ST_G_THROUGH_GAP = "G_THROUGH_GAP"  # 低重心推球穿缝，狗随球进圈
@@ -73,8 +76,8 @@ _ST_K_KICK = "K_KICK"   # 快步态把球踢/推过缺口，狗随球进圈
 # ── 状态机全局变量 ──
 _state = None
 _laydown_count = 0
-_sweep_x0 = None   # D 段横移起点 x（进 D 首帧记录）
-_sweep_y0 = None   # D 段横移起点 y
+_sweep_x0 = None   # D1/D2 段横移起点 x（进 D1/D2 首帧记录）
+_sweep_y0 = None   # D1/D2 段横移起点 y
 
 
 def reset_segment6():
@@ -183,20 +186,34 @@ def segment6_control(position, gait_mode, rpy, frame=None):
         ts = _turn_step(rpy, HDG_SWEEP)
         if ts != 0:
             return ts
-        _state = _ST_D_SWEEP
-        return G_SWEEP
+        _state = _ST_D1_SWEEP
+        return G_SWEEP_L
 
-    # ── D：低重心左横移把球顶出角落，里程位移≥SWEEP_DIST退出 ──
-    elif _state == _ST_D_SWEEP:
-        if _sweep_x0 is None:               # 进 D 首帧记起点
+    # ── D1：低重心左横移把球扫出角落，里程位移≥SWEEP_L_DIST → 转 D2 ──
+    elif _state == _ST_D1_SWEEP:
+        if _sweep_x0 is None:               # 进 D1 首帧记起点
             _sweep_x0, _sweep_y0 = x, y
-        if _dist(x, y, _sweep_x0, _sweep_y0) >= SWEEP_DIST:
-            _state = _ST_E_FACE_PUSH
-            return G_STAND
+        if _dist(x, y, _sweep_x0, _sweep_y0) >= SWEEP_L_DIST:
+            _sweep_x0 = None                # 清起点，留给 D2 重记
+            _sweep_y0 = None
+            _state = _ST_D2_CLEAR
+            return G_SWEEP_R
         ts = _turn_step(rpy, HDG_SWEEP)     # 漂移先转回225°再横移
         if ts != 0:
             return ts
-        return G_SWEEP
+        return G_SWEEP_L
+
+    # ── D2：低重心右横移退开拉间隙，里程位移≥SWEEP_R_DIST → 转 E（此时转身不碰球）──
+    elif _state == _ST_D2_CLEAR:
+        if _sweep_x0 is None:               # 进 D2 首帧重记起点
+            _sweep_x0, _sweep_y0 = x, y
+        if _dist(x, y, _sweep_x0, _sweep_y0) >= SWEEP_R_DIST:
+            _state = _ST_E_FACE_PUSH
+            return G_STAND
+        ts = _turn_step(rpy, HDG_SWEEP)
+        if ts != 0:
+            return ts
+        return G_SWEEP_R
 
     # ── E：原地转身头朝328°正对被顶出的球 ──
     elif _state == _ST_E_FACE_PUSH:

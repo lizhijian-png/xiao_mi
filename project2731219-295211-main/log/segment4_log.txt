@@ -32,3 +32,38 @@
 2026-05-27 21:36:03 ROUTE state=S4_ROUTE_MID_BACKUP_AFTER_ORANGE pos=(1.000,10.940,0.000) rpy=90.0
 2026-05-27 21:36:03 STATE old=S4_ROUTE_MID_BACKUP_AFTER_ORANGE new=S4_ROUTE_MID_TURN_BACK reason=route_orange_backup_done obs=0 target=0 pos=(1.000,10.940,0.000)
 2026-05-27 21:36:03 STEP step=0 reason=route_orange_backup_done state=S4_ROUTE_MID_TURN_BACK obs=0 target=0 pos=(1.000,10.940,0.000) rpy=90.0
+2026-05-31 21:50:16 TICK state=S4_RIGHT_TO_LOW_START pos=(2.200,9.910,0.000) rpy=90.0 gait=3 mode=11
+2026-05-31 21:50:16 ROUTE state=S4_RIGHT_TO_LOW_START pos=(2.200,9.910,0.000) rpy=90.0
+2026-05-31 21:50:16 STATE old=S4_RIGHT_TO_LOW_START new=S4_RIGHT_PRE_LOW_ALIGN_X reason=route_right_pre_low_start pos=(2.200,9.910,0.000)
+2026-05-31 21:50:16 STEP step=0 reason=route_right_pre_low_start state=S4_RIGHT_PRE_LOW_ALIGN_X pos=(2.200,9.910,0.000) rpy=90.0
+2026-05-31 21:50:16 TICK state=S4_RIGHT_PRE_LOW_ALIGN_X pos=(2.200,9.910,0.000) rpy=90.0 gait=3 mode=11
+2026-05-31 21:50:16 ROUTE state=S4_RIGHT_PRE_LOW_ALIGN_X pos=(2.200,9.910,0.000) rpy=90.0
+2026-05-31 21:50:16 STEP step=46 reason=route_right_pre_low_align_x state=S4_RIGHT_PRE_LOW_ALIGN_X pos=(2.200,9.910,0.000) rpy=90.0
+2026-05-31 21:50:16 TICK state=S4_RIGHT_PRE_LOW_ALIGN_X pos=(2.100,9.910,0.000) rpy=95.0 gait=3 mode=11
+2026-05-31 21:50:16 ROUTE state=S4_RIGHT_PRE_LOW_ALIGN_X pos=(2.100,9.910,0.000) rpy=95.0
+2026-05-31 21:50:16 STATE old=S4_RIGHT_PRE_LOW_ALIGN_X new=S4_RIGHT_PRE_LOW_ALIGN_HEADING reason=route_right_pre_low_x_done pos=(2.100,9.910,0.000)
+2026-05-31 21:50:16 STEP step=0 reason=route_right_pre_low_x_done state=S4_RIGHT_PRE_LOW_ALIGN_HEADING pos=(2.100,9.910,0.000) rpy=95.0
+2026-05-31 21:50:16 TICK state=S4_RIGHT_PRE_LOW_ALIGN_HEADING pos=(2.100,9.910,0.000) rpy=95.0 gait=3 mode=11
+2026-05-31 21:50:16 ROUTE state=S4_RIGHT_PRE_LOW_ALIGN_HEADING pos=(2.100,9.910,0.000) rpy=95.0
+2026-05-31 21:50:16 STEP step=3 reason=route_right_pre_low_align_heading state=S4_RIGHT_PRE_LOW_ALIGN_HEADING pos=(2.100,9.910,0.000) rpy=95.0
+2026-05-31 21:50:16 ROUTE state=S4_RIGHT_PRE_LOW_ALIGN_HEADING pos=(2.100,9.910,0.000) rpy=90.5
+2026-05-31 21:50:16 STATE old=S4_RIGHT_PRE_LOW_ALIGN_HEADING new=S4_RIGHT_LOW_ALIGN reason=route_right_enter_low_at_9_9m pos=(2.100,9.910,0.000)
+2026-05-31 21:50:16 STEP step=5 reason=route_right_enter_low_at_9_9m state=S4_RIGHT_LOW_ALIGN pos=(2.100,9.910,0.000) rpy=90.5
+2026-06-01 01:05:00 TICK state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,11.020,0.000) rpy=90.0 gait=36 mode=11
+2026-06-01 01:05:00 ROUTE state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,11.020,0.000) rpy=90.0
+2026-06-01 01:05:00 STEP step=36 reason=route_right_backup_after_ball state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,11.020,0.000) rpy=90.0
+2026-06-01 01:05:00 ROUTE state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,11.000,0.000) rpy=90.0
+2026-06-01 01:05:00 STEP step=36 reason=route_right_backup_after_ball state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,11.000,0.000) rpy=90.0
+2026-06-01 01:05:00 TICK state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,10.900,0.000) rpy=90.0 gait=36 mode=11
+2026-06-01 01:05:00 ROUTE state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,10.900,0.000) rpy=90.0
+2026-06-01 01:05:00 STEP step=36 reason=route_right_backup_after_ball state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,10.900,0.000) rpy=90.0
+2026-06-01 01:05:00 TICK state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,10.810,0.000) rpy=90.0 gait=36 mode=11
+2026-06-01 01:05:00 ROUTE state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,10.810,0.000) rpy=90.0
+2026-06-01 01:05:00 STEP step=36 reason=route_right_backup_after_ball state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,10.810,0.000) rpy=90.0
+2026-06-01 01:05:00 ROUTE state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,10.790,0.000) rpy=90.0
+2026-06-01 01:05:00 STATE old=S4_RIGHT_ALIGN_AFTER_BALL new=S4_RIGHT_TURN_BACK_LOW reason=route_right_backup_after_ball_done pos=(2.100,10.790,0.000)
+2026-06-01 01:05:00 STEP step=5 reason=route_right_backup_after_ball_done state=S4_RIGHT_TURN_BACK_LOW pos=(2.100,10.790,0.000) rpy=90.0
+2026-06-01 01:15:46 TICK state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,10.910,0.000) rpy=89.0 gait=45 mode=11
+2026-06-01 01:15:46 ROUTE state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,10.910,0.000) rpy=89.0
+2026-06-01 01:15:46 STEP step=45 reason=route_right_backup_after_ball state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,10.910,0.000) rpy=89.0
+2026-06-01 01:15:46 STEP step=0 reason=recover_from_down state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,10.910,0.000) rpy=89.0

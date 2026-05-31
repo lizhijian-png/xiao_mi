@@ -669,19 +669,115 @@ step_height = [ 0.04, 0.04,]
 value = 0
 duration = 300
 
-#51 赛段5上台阶跳跃动作：y=7.35附近跳上一开始的5cm台阶（速度0.22，抬脚0.22）
+#58 第四段前进+左修正：官方 LOCOMOTION 快走 TROT_MEDIUM，竖向通道边走边回中心线。
+[[step]]
+mode = 11
+gait_id = 3
+contact = 15
+life_count = 0
+vel_des = [ 0.40, 0.08, 0.0,]
+rpy_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.20,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.03, 0.03,]
+value = 0
+duration = 0
+
+#59 第四段前进+右修正：官方 LOCOMOTION 快走 TROT_MEDIUM，竖向通道边走边回中心线。
+[[step]]
+mode = 11
+gait_id = 3
+contact = 15
+life_count = 0
+vel_des = [ 0.40, -0.08, 0.0,]
+rpy_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.20,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.03, 0.03,]
+value = 0
+duration = 0
+
+#54 第四段快走：官方 LOCOMOTION 快走 TROT_MEDIUM，替代普通慢走，提高直线段速度。
+[[step]]
+mode = 11
+gait_id = 3
+contact = 15
+life_count = 0
+vel_des = [ 0.45, 0.0, 0.0,]
+rpy_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.20,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.03, 0.03,]
+value = 0
+duration = 0
+
+#55 第四段快退：官方 LOCOMOTION 慢走 TROT_SLOW，负向速度用于目标撞击后的短距离后退。
 [[step]]
 mode = 11
 gait_id = 27
 contact = 15
 life_count = 0
-vel_des = [ 0.22, 0.0, 0.0,]
+vel_des = [ -0.16, 0.0, 0.0,]
+rpy_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.20,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.03, 0.03,]
+value = 0
+duration = 0
+
+#56 第四段左平移校正：官方 LOCOMOTION 慢走 TROT_SLOW，横向速度用于更快回到中心线。
+[[step]]
+mode = 11
+gait_id = 27
+contact = 15
+life_count = 0
+vel_des = [ 0.0, 0.09, 0.0,]
+rpy_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.0,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.04, 0.04,]
+value = 0
+duration = 0
+
+#57 第四段右平移校正：官方 LOCOMOTION 慢走 TROT_SLOW，横向速度用于更快回到中心线。
+[[step]]
+mode = 11
+gait_id = 27
+contact = 15
+life_count = 0
+vel_des = [ 0.0, -0.09, 0.0,]
+rpy_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.0,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.04, 0.04,]
+value = 0
+duration = 0
+
+#51 赛段5上台阶高抬脚动作：覆盖前后脚上台阶，提高前向速度和抬脚高度，避免后脚卡台阶边缘。
+[[step]]
+mode = 11
+gait_id = 27
+contact = 15
+life_count = 0
+vel_des = [ 0.26, 0.0, 0.0,]
 rpy_des = [ -0.08, 0.0, 0.0,]
 pos_des = [ 0.0, 0.0, 0.0,]
 acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
 ctrl_point = [ 0.0, 0.0, 0.0,]
 foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
-step_height = [ 0.22, 0.22,]
+step_height = [ 0.26, 0.26,]
 value = 0
 duration = 0
 

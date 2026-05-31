@@ -27,7 +27,6 @@ GAP_X = 2.80   # 缺口随右边界收紧（原 2.90）
 # ── 路径航点（狗机身中心目标值，绝对坐标）──
 TOP_Y        = 14.80   # A 退出：贴顶墙（顶墙15.0，继续贴墙后中心≈14.85、下缘≈14.70>球顶14.60）
 CORNER_X     = 0.20    # B 退出：狗中心到此即到左上角（左墙x=0.0挡停）
-NUDGE_EXIT_X = 0.35    # D 退出：狗中心x（后体已扫过球0.50、球被顶离角）
 KICK_TRIGGER_X = 2.40  # F→G：狗到此x改快速步态
 FINISH_STOP_X  = FINISH_CX  # G：随球停在圈心x（不留余量，确保后脚进缺口）
 XY_TOL = 0.08          # 航点到达容差
@@ -35,7 +34,8 @@ XY_TOL = 0.08          # 航点到达容差
 # ── 朝向角度 ──
 HDG_UP      = 90    # A 朝向：+y 上行
 HDG_LEFT    = 180   # B 朝向：-x 左行
-HDG_HEAD_IN = 148   # C 目标头朝向：扎进左上角（尾朝328°对准缺口）
+HDG_SWEEP   = 225   # C 目标头朝向：逆时针转到左下方（左侧身体朝右下顶球）
+SWEEP_DIST  = 0.20  # D 退出：横移里程位移阈值（约20cm）
 HDG_PUSH    = 328   # E/F/G 头朝向：球→缺口→圈心方向（atan2(-1.65,2.65)≈-31.9°→328.1°）
 HDG_FINISH  = 0     # 终点圈内趴下前转身朝向：正对 +x
 FAST_DEG, SLOW_DEG = 20, 8
@@ -49,6 +49,7 @@ G_BACK_SLOW, G_BACK  = 6, 26      # 后退 -0.10 / -0.20
 G_FTURN_L, G_FTURN_R = 14, 15     # 快转 ±0.60
 G_KICK   = 28    # 快前进0.30
 G_PUSH   = 43    # 推球低重心前进0.20
+G_SWEEP  = 44    # 低重心左横移 vel_y+0.08、posZ-0.08（D 段顶球）
 
 # ── 踢球退路开关（倒顶若仿真失败，置 True 切踢射方案）──
 USE_KICK_FALLBACK = False
@@ -56,8 +57,8 @@ USE_KICK_FALLBACK = False
 # ── 状态机状态（八阶段）──
 _ST_A_GO_TOP      = "A_GO_TOP"       # 转90°贴右墙上行到顶墙
 _ST_B_GO_CORNER   = "B_GO_CORNER"    # 转180°贴顶墙左行到左上角（两墙自定位）
-_ST_C_AIM_TAIL    = "C_AIM_TAIL"     # 转头到148°（尾朝328°对准缺口）
-_ST_D_NUDGE       = "D_NUDGE"        # 后退步态让后体扫过球，把球沿328°顶出角落
+_ST_C_AIM_SWEEP   = "C_AIM_SWEEP"    # 转头到225°（左侧身体朝右下对球）
+_ST_D_SWEEP       = "D_SWEEP"        # 低重心左横移，把球顶出角落
 _ST_E_FACE_PUSH   = "E_FACE_PUSH"    # 原地转身头朝328°正对被顶出的球
 _ST_F_DRIBBLE     = "F_DRIBBLE"      # 锁328°低重心前推带球到缺口前
 _ST_G_THROUGH_GAP = "G_THROUGH_GAP"  # 低重心推球穿缝，狗随球进圈
@@ -72,13 +73,17 @@ _ST_K_KICK = "K_KICK"   # 快步态把球踢/推过缺口，狗随球进圈
 # ── 状态机全局变量 ──
 _state = None
 _laydown_count = 0
+_sweep_x0 = None   # D 段横移起点 x（进 D 首帧记录）
+_sweep_y0 = None   # D 段横移起点 y
 
 
 def reset_segment6():
     """每次比赛/测试前重置赛段6状态。"""
-    global _state, _laydown_count
+    global _state, _laydown_count, _sweep_x0, _sweep_y0
     _state = _ST_A_GO_TOP
     _laydown_count = 0
+    _sweep_x0 = None
+    _sweep_y0 = None
 
 
 def _norm(a):
@@ -141,7 +146,7 @@ def segment6_control(position, gait_mode, rpy, frame=None):
     rpy: float 机身朝向角(°) 来自 Pos_msg.rpy[2]
     frame: 相机帧或 None（视觉钩子，默认关闭）
     """
-    global _state, _laydown_count
+    global _state, _laydown_count, _sweep_x0, _sweep_y0
     x, y = position[0], position[1]
     gait, mode = gait_mode
 
@@ -169,27 +174,29 @@ def segment6_control(position, gait_mode, rpy, frame=None):
     # ── B：转180°贴顶墙左行到左上角（左墙挡停，两墙自定位）──
     elif _state == _ST_B_GO_CORNER:
         if x <= CORNER_X:
-            _state = _ST_C_AIM_TAIL
+            _state = _ST_C_AIM_SWEEP
             return G_STAND
         return _walk(rpy, HDG_LEFT, G_NAV)
 
-    # ── C：转头到148°（尾朝328°对准缺口）──
-    elif _state == _ST_C_AIM_TAIL:
-        ts = _turn_step(rpy, HDG_HEAD_IN)
+    # ── C：原地转头到225°（左侧身体朝右下对球）──
+    elif _state == _ST_C_AIM_SWEEP:
+        ts = _turn_step(rpy, HDG_SWEEP)
         if ts != 0:
             return ts
-        _state = _ST_D_NUDGE
-        return G_BACK
+        _state = _ST_D_SWEEP
+        return G_SWEEP
 
-    # ── D：后退步态让后体扫过球，把球沿328°顶出角落 ──
-    elif _state == _ST_D_NUDGE:
-        if x >= NUDGE_EXIT_X:
+    # ── D：低重心左横移把球顶出角落，里程位移≥SWEEP_DIST退出 ──
+    elif _state == _ST_D_SWEEP:
+        if _sweep_x0 is None:               # 进 D 首帧记起点
+            _sweep_x0, _sweep_y0 = x, y
+        if _dist(x, y, _sweep_x0, _sweep_y0) >= SWEEP_DIST:
             _state = _ST_E_FACE_PUSH
             return G_STAND
-        ts = _turn_step(rpy, HDG_HEAD_IN)   # 保持头朝148°，漂移先转回再退
+        ts = _turn_step(rpy, HDG_SWEEP)     # 漂移先转回225°再横移
         if ts != 0:
             return ts
-        return G_BACK
+        return G_SWEEP
 
     # ── E：原地转身头朝328°正对被顶出的球 ──
     elif _state == _ST_E_FACE_PUSH:

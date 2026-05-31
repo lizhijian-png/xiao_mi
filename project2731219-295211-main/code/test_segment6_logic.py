@@ -72,32 +72,40 @@ def test_B_go_corner_then_C_at_corner():
     step, st = _drive((2.0, 14.95), s6.HDG_LEFT)
     assert step == s6.G_NAV and st == s6._ST_B_GO_CORNER
     step, st = _drive((s6.CORNER_X - 0.01, 14.95), s6.HDG_LEFT)
-    assert st == s6._ST_C_AIM_TAIL and step == s6.G_STAND
+    assert st == s6._ST_C_AIM_SWEEP and step == s6.G_STAND
 
 
-def test_C_aim_tail_turns_to_148_then_D():
+def test_C_aim_sweep_turns_to_225_then_D():
     s6.reset_segment6()
-    s6._state = s6._ST_C_AIM_TAIL
-    step, st = _drive((0.15, 14.95), 180)
-    assert step == s6._turn_step(180, s6.HDG_HEAD_IN) and st == s6._ST_C_AIM_TAIL
-    step, st = _drive((0.15, 14.95), s6.HDG_HEAD_IN)
-    assert st == s6._ST_D_NUDGE and step == s6.G_BACK
+    s6._state = s6._ST_C_AIM_SWEEP
+    # 未对准225° → 先转向，状态留在 C
+    step, st = _drive((0.20, 14.95), 180)
+    assert step == s6._turn_step(180, s6.HDG_SWEEP) and st == s6._ST_C_AIM_SWEEP
+    # 对准225° → 进 D，首发低重心横移步态
+    step, st = _drive((0.20, 14.95), s6.HDG_SWEEP)
+    assert st == s6._ST_D_SWEEP and step == s6.G_SWEEP
 
 
-def test_D_nudge_backs_then_E():
+def test_D_sweep_moves_then_E():
     s6.reset_segment6()
-    s6._state = s6._ST_D_NUDGE
-    step, st = _drive((0.20, 14.90), s6.HDG_HEAD_IN)
-    assert step == s6.G_BACK and st == s6._ST_D_NUDGE
-    step, st = _drive((s6.NUDGE_EXIT_X + 0.01, 14.80), s6.HDG_HEAD_IN)
+    s6._state = s6._ST_D_SWEEP
+    # 进 D 首帧记起点(0.20,14.95)，位移0 < SWEEP_DIST → 持续发横移
+    step, st = _drive((0.20, 14.95), s6.HDG_SWEEP)
+    assert step == s6.G_SWEEP and st == s6._ST_D_SWEEP
+    assert s6._sweep_x0 == 0.20 and s6._sweep_y0 == 14.95
+    # 位移仍不足 → 继续横移
+    step, st = _drive((0.28, 14.85), s6.HDG_SWEEP)
+    assert step == s6.G_SWEEP and st == s6._ST_D_SWEEP
+    # 位移≥SWEEP_DIST(从起点(0.20,14.95)走 hypot(0.16,0.16)=0.226m≥0.20) → 进 E，发站立
+    step, st = _drive((0.36, 14.79), s6.HDG_SWEEP)
     assert st == s6._ST_E_FACE_PUSH and step == s6.G_STAND
 
 
 def test_E_face_push_turns_to_328_then_F():
     s6.reset_segment6()
     s6._state = s6._ST_E_FACE_PUSH
-    step, st = _drive((0.5, 14.6), s6.HDG_HEAD_IN)
-    assert step == s6._turn_step(s6.HDG_HEAD_IN, s6.HDG_PUSH) and st == s6._ST_E_FACE_PUSH
+    step, st = _drive((0.5, 14.6), s6.HDG_SWEEP)
+    assert step == s6._turn_step(s6.HDG_SWEEP, s6.HDG_PUSH) and st == s6._ST_E_FACE_PUSH
     step, st = _drive((0.5, 14.6), s6.HDG_PUSH)
     assert st == s6._ST_F_DRIBBLE and step == s6.G_PUSH
 

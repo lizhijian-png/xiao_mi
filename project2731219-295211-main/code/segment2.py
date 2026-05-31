@@ -24,7 +24,7 @@ EXIT_TARGET = {"x": -0.3, "y": 4.7, "strike_y": 4.50}
 # ── 控制参数 ────────────────────────────────────────────────────
 STONE_SAFE_Y   = 0.90   # 低于此 y 禁止横移（石板安全线）
 PRE_SHIFT_DIST = 0.10   # 预横移距离（m）
-FREEZE_OFFSET  = 0.40   # row_y - FREEZE_OFFSET：停止横移开始纯前进
+FREEZE_OFFSET  = 0.42   # row_y - FREEZE_OFFSET：停止横移开始纯前进
 STRIKE_OFFSET  = 0.20   # row_y - STRIKE_OFFSET：冲击终止线
 ALIGN_X_TOL    = 0.05   # 对准 x 容差（m）
 ALIGN_PX_TOL   = 30     # 视觉对准像素容差（px）
@@ -219,8 +219,7 @@ def segment2_control(position, gait_mode, rpy, frame=None):
     # ── CLEAR_STONE：入场纯前进，脱离石板区 ─────────────────────
     if _state == _ST_CLEAR_STONE:
         if y >= STONE_SAFE_Y:
-            _state = _ST_INTER_ROW_SHIFT
-            _shift_start_x = x
+            _state = _ST_ADVANCE_FREEZE   # 直接前进，跳过入场预横移
             return 0
         return 1
 

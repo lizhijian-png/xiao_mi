@@ -121,3 +121,12 @@ def test_H_laydown_advances_even_when_mode7():
     for _ in range(3):
         last, st = _drive((s6.FINISH_CX, s6.FINISH_CY), s6.HDG_PUSH, gait_mode=(0, 7))
     assert last == -1 and st == s6._ST_DONE
+
+
+def test_DONE_returns_minus1_even_when_mode7():
+    # 回归保护：DONE 是终止态，即使 mode==7（趴下中）也须无条件返回 -1，
+    # 不能被顶部等待判据拦成 G_STAND（否则赛段永不报完成）。
+    s6.reset_segment6()
+    s6._state = s6._ST_DONE
+    step = s6.segment6_control([s6.FINISH_CX, s6.FINISH_CY, 0.0], [0, 7], s6.HDG_PUSH)
+    assert step == -1 and s6._state == s6._ST_DONE

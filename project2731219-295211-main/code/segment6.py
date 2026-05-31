@@ -225,7 +225,7 @@ def _kick_fallback_control(x, y, rpy):
 
     复用主线朝向/步态/状态骨架，去掉 C/D 倒退环节。
     倒顶若仿真反复顶不到球/顶歪时，置 USE_KICK_FALLBACK=True 启用。
-    收尾复用主线 _ST_H_LAYDOWN / _ST_DONE。
+    收尾自带 H/DONE 计数（与主线同形）。
     """
     global _state, _laydown_count
 
@@ -248,7 +248,7 @@ def _kick_fallback_control(x, y, rpy):
             return G_STAND
         return _walk(rpy, HDG_PUSH, G_KICK)
 
-    # ── 收尾复用主线趴下（H/DONE 也由 segment6_control 处理）──
+    # ── 收尾趴下：本函数自带 H/DONE 副本完成计数（主控仅贡献等待判据对 H/DONE 的豁免）──
     elif _state == _ST_H_LAYDOWN:
         _laydown_count += 1
         if _laydown_count >= 3:

@@ -159,6 +159,11 @@ def test_kick_fallback_chases_into_circle_then_lays():
         # 到圈心x → 进入趴下
         step = s6.segment6_control([s6.FINISH_STOP_X, 12.85, 0.0], [11, 0], s6.HDG_PUSH)
         assert step == s6.G_STAND and s6._state == s6._ST_H_LAYDOWN
+        # 趴下计数：本函数自带 H/DONE 副本，驱动到 DONE 返回 -1（防与主线漂移）
+        last = None
+        for _ in range(3):
+            last = s6.segment6_control([s6.FINISH_CX, s6.FINISH_CY, 0.0], [11, 0], s6.HDG_PUSH)
+        assert last == -1 and s6._state == s6._ST_DONE
     finally:
         s6.USE_KICK_FALLBACK = False
         s6.reset_segment6()

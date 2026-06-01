@@ -22,7 +22,7 @@ RIGHT_LANE_X = 2.10
 
 # y=7.10 是第四段底部公共横向通道；第一段到第二段改为斜向过渡。
 LANE_SWITCH_Y = 7.10
-ROUTE_SWITCH_Y = 8.85
+ROUTE_SWITCH_Y = 9.11
 LEFT_TO_MID_START_Y = 8.40
 LEFT_TO_MID_TARGET = (MID_LANE_X, 9.50)
 
@@ -43,12 +43,10 @@ RIGHT_LOW_START_Y = 9.90
 RIGHT_STAND_Y = RIGHT_BAR_Y
 
 # 目标物坐标和动作结束坐标。
-# 可乐：到 y=11.10 播报，到 y=11.15 开始倒退。
-# 小球：到 y=11.00 播报，到 y=11.05 开始倒退。
-# 足球：到 y=11.00 播报并开始回退，避免过深进入球框区域。
-COLA = {"x": LEFT_LANE_X, "y": 11.10, "backup_y": 11.15}
-ORANGE_BALL = {"x": 0.94, "y": 11.00, "backup_y": 11.05}
-FOOTBALL = {"x": RIGHT_LANE_X, "announce_y": 11.00, "backup_y": 11.00}
+# 可乐/小球按固定目标位置前 0.20m 播报；足球按上行终点前 0.15m 播报。
+COLA = {"x": LEFT_LANE_X, "announce_y": 10.90, "y": 11.10, "backup_y": 11.15}
+ORANGE_BALL = {"x": 0.94, "announce_y": 10.80, "y": 11.00, "backup_y": 11.05}
+FOOTBALL = {"x": RIGHT_LANE_X, "announce_y": 10.90, "backup_y": 11.05}
 
 # 限高杆检测和动作距离参数。
 LEFT_BAR_DETECT_UP_Y = LEFT_BAR["y_min"]
@@ -329,11 +327,14 @@ def _forward_step(rpy, heading, gait=S4_FAST_FORWARD_GAIT):
 
 def _forward_lane_step(position, rpy, heading, lane_x, gait=S4_FAST_FORWARD_GAIT):
     """竖向通道边前进边按 x 中心线微调，避免偏离 -0.1/1.0/2.1 太远。"""
+    if gait == LOW_BAR_GAIT:
+        # 低姿态区间不再做方向纠偏；方向已在 RIGHT_PRE_LOW_ALIGN_HEADING 中于蹲下前校准。
+        # 否则蹲走中返回普通转向步态会导致机身短暂抬高。
+        return gait
+
     step = _turn_to(rpy, heading)
     if step != 1:
         return step
-    if gait == LOW_BAR_GAIT:
-        return gait
 
     x_err = position[0] - lane_x
     if abs(x_err) <= XY_TOL:
@@ -597,7 +598,7 @@ def _route_left_lane(position, rpy, frame):
     if _state == S["LEFT_FIND_COLA"]:
         detected = _detect_target(frame, "cola")
         _log_event("ROUTE_TARGET_SCAN", target="cola", detected=detected, pos=_fmt_pos(position))
-        if detected or y >= COLA["y"]:
+        if detected or y >= COLA["announce_y"]:
             _announce_once("cola", "可乐瓶")
         if y >= COLA["backup_y"]:
             _motion_start_reset(position)
@@ -667,7 +668,7 @@ def _route_mid_lane(position, rpy, frame):
     if _state == S["MID_FIND_ORANGE"]:
         detected = _detect_target(frame, "orange_ball")
         _log_event("ROUTE_TARGET_SCAN", target="orange_ball", detected=detected, pos=_fmt_pos(position))
-        if detected or y >= ORANGE_BALL["y"]:
+        if detected or y >= ORANGE_BALL["announce_y"]:
             _announce_once("orange_ball", "橙色小球")
         if y >= ORANGE_BALL["backup_y"]:
             _motion_start_reset(position)
@@ -678,14 +679,14 @@ def _route_mid_lane(position, rpy, frame):
         step = _backup_to_distance(position, S["MID_TURN_BACK"], "route_orange_backup_done", ORANGE_BACKUP_DIST)
         return _return_step(step, "route_orange_backup", position, rpy)
 
-    # 返程：回到中线并检查不可跨越障碍，播报后回到换道线。
+    # 返程：回到中线并在第二段下行终点 ROUTE_SWITCH_Y 播报障碍物，随后切到第三段。
     if _state == S["MID_TURN_BACK"]:
         return _turn_state(rpy, HEADING_SOUTH, S["MID_ALIGN_DOWN"], "route_mid_turn_back_done", position)
     if _state == S["MID_ALIGN_DOWN"]:
         return _adjust_x(position, rpy, MID_LANE_X, HEADING_SOUTH, S["MID_CHECK_BLOCK"], "route_mid_align_down_done")
     if _state == S["MID_CHECK_BLOCK"]:
-        if y <= 9.95 or _detect_obstacle(frame):
-            _announce_once("block", "无法跨越障碍")
+        if y <= ROUTE_SWITCH_Y:
+            _announce_once("block", "障碍物")
             _set_state(S["MID_RETURN_Y"], "route_mid_block_checked", position)
             return _return_step(0, "route_mid_block_checked", position, rpy)
         return _return_step(_forward_lane_step(position, rpy, HEADING_SOUTH, MID_LANE_X), "route_mid_check_block_forward", position, rpy)
@@ -714,6 +715,7 @@ def _route_right_lane(position, rpy, frame):
     # 到 y=9.90 后先停住，独立完成 x=2.10 中心线校准和最终朝向校准，然后进入低姿态区间。
     if _state == S["RIGHT_TO_LOW_START"]:
         if y >= RIGHT_LOW_START_Y:
+            _announce_once("right_bar", "限高杆")
             _stand_count = 0
             _set_state(S["RIGHT_PRE_LOW_ALIGN_X"], "route_right_pre_low_start", position)
             return _return_step(0, "route_right_pre_low_start", position, rpy)
@@ -750,7 +752,7 @@ def _route_right_lane(position, rpy, frame):
         _set_state(S["RIGHT_LOW_FORWARD"], "route_right_low_align_done", position)
         return _return_step(LOW_BAR_GAIT, "route_right_low_align_done", position, rpy)
 
-    # 低姿态前进：过限高杆后继续推足球，到 y=11.00 认为足球已进门并开始后退。
+    # 低姿态前进：过限高杆后继续推足球，到 y=11.05 认为足球已进门并开始后退。
     if _state == S["RIGHT_LOW_FORWARD"]:
         detected = _detect_target(frame, "football")
         _log_event("ROUTE_TARGET_SCAN", target="football", detected=detected, pos=_fmt_pos(position))
@@ -760,8 +762,8 @@ def _route_right_lane(position, rpy, frame):
             _announce_once("football", "足球")
         if y >= FOOTBALL["backup_y"]:
             _motion_start_reset(position)
-            _set_state(S["RIGHT_ALIGN_AFTER_BALL"], "route_football_reach_11_00", position)
-            return _return_step(LOW_BACKUP_GAIT, "route_football_reach_11_00", position, rpy)
+            _set_state(S["RIGHT_ALIGN_AFTER_BALL"], "route_football_reach_11_05", position)
+            return _return_step(LOW_BACKUP_GAIT, "route_football_reach_11_05", position, rpy)
         return _return_step(_forward_lane_step(position, rpy, HEADING_NORTH, RIGHT_LANE_X, LOW_BAR_GAIT), "route_right_low_forward", position, rpy)
 
     # 足球到位后先短退 0.13m，再转身，先纠正回 x=2.10，再低姿态向前走回 y=10.40。
@@ -781,6 +783,7 @@ def _route_right_lane(position, rpy, frame):
     if _state == S["RIGHT_ALIGN_BACK_LOW"]:
         return _adjust_x(position, rpy, RIGHT_LANE_X, HEADING_SOUTH, S["RIGHT_BACKUP_LOW"], "route_right_align_back_x_done")
     if _state == S["RIGHT_BACKUP_LOW"]:
+        _announce_once("right_bar_down", "限高杆")
         if _right_low_start is None or y <= _right_low_start[1]:
             _stand_count = 0
             _set_state(S["RIGHT_STAND"], "route_right_low_return_to_10_4m_done", position)

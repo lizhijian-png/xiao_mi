@@ -67,3 +67,17 @@
 2026-06-01 01:15:46 ROUTE state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,10.910,0.000) rpy=89.0
 2026-06-01 01:15:46 STEP step=45 reason=route_right_backup_after_ball state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,10.910,0.000) rpy=89.0
 2026-06-01 01:15:46 STEP step=0 reason=recover_from_down state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,10.910,0.000) rpy=89.0
+2026-06-01 18:32:52 TICK state=S4_RIGHT_LOW_FORWARD pos=(2.100,10.200,0.000) rpy=105.0 gait=27 mode=11
+2026-06-01 18:32:52 ROUTE state=S4_RIGHT_LOW_FORWARD pos=(2.100,10.200,0.000) rpy=105.0
+2026-06-01 18:32:52 ROUTE_TARGET_SCAN target=football detected=False pos=(2.100,10.200,0.000)
+2026-06-01 18:32:52 STEP step=5 reason=route_right_low_forward state=S4_RIGHT_LOW_FORWARD pos=(2.100,10.200,0.000) rpy=105.0
+2026-06-01 18:32:52 TICK state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,11.030,0.000) rpy=90.0 gait=110 mode=62
+2026-06-01 18:32:52 ROUTE state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,11.030,0.000) rpy=90.0
+2026-06-01 18:32:52 STEP step=57 reason=route_right_backup_after_ball state=S4_RIGHT_ALIGN_AFTER_BALL pos=(2.100,11.030,0.000) rpy=90.0
+2026-06-01 18:32:52 TICK state=S4_RIGHT_TURN_BACK_LOW pos=(2.100,10.950,0.000) rpy=90.0 gait=110 mode=62
+2026-06-01 18:32:52 ROUTE state=S4_RIGHT_TURN_BACK_LOW pos=(2.100,10.950,0.000) rpy=90.0
+2026-06-01 18:32:52 STEP step=59 reason=route_right_turn_back_low_done_turn state=S4_RIGHT_TURN_BACK_LOW pos=(2.100,10.950,0.000) rpy=90.0
+2026-06-01 18:32:52 TICK state=S4_RIGHT_BACKUP_LOW pos=(2.100,10.800,0.000) rpy=250.0 gait=110 mode=62
+2026-06-01 18:32:52 ROUTE state=S4_RIGHT_BACKUP_LOW pos=(2.100,10.800,0.000) rpy=250.0
+2026-06-01 18:32:53 ANNOUNCE key=right_bar_down text=限高杆
+2026-06-01 18:32:53 STEP step=5 reason=route_right_low_forward_back_to_bar state=S4_RIGHT_BACKUP_LOW pos=(2.100,10.800,0.000) rpy=250.0

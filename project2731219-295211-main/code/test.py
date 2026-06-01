@@ -496,7 +496,15 @@ def main():
         def print_worker():
             while True:
                 from segment2 import _state as seg2_state, _target_idx as seg2_row
-                print(f"当前位置: {pos_msg.position} 机身朝向{pos_msg.rpy[2]} 箭头识别结果{results['ARROW']} 选择:{my_ctrl.num} seg2={seg2_state}/row{seg2_row}")
+                from segment5 import _state as seg5_state
+                from segment6 import _state as seg6_state
+                if flags["ENDING_FLAG5"] == False and flags["ENDING_FLAG4"] == True:
+                    active_state = f"seg5={seg5_state}"
+                elif flags["ENDING_FLAG6"] == False and flags["ENDING_FLAG5"] == True:
+                    active_state = f"seg6={seg6_state}"
+                else:
+                    active_state = f"seg2={seg2_state}/row{seg2_row}"
+                print(f"当前位置: {pos_msg.position} 机身朝向{pos_msg.rpy[2]} 箭头识别结果{results['ARROW']} 选择:{my_ctrl.num} {active_state}")
                 print(f"{gait_msg.gait_mode}")
                 time.sleep(0.2)
         thread = threading.Thread(target=print_worker)

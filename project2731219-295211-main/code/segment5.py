@@ -28,7 +28,8 @@ import time
 
 # ── 赛道几何参数（绝对坐标，米）───────────────────────────────────
 # 中心线坐标
-CENTER_X_SEG1 = 3.15    # 分段1、5 中心线 x
+CENTER_X_SEG1_START = 3.15  # 第五段开头到 y=9.00 前使用的中心线，避免起步阶段超过 x=3.15
+CENTER_X_SEG1 = 3.15    # y=9.00 后恢复的分段1中心线 x
 CENTER_X_SEG5 = 3.10    # 第五段最后一段 y- 行进基准线，起跳前远离 x- 台边，减少后脚挂边
 CENTER_Y_SEG2 = 12.35   # 分段2 中心线 y
 CENTER_X_SEG3 = -0.35   # 分段3 中心线 x
@@ -45,13 +46,16 @@ FINAL_JUMP_Y = 13.35  # 最后一段沿 y- 走到约 (3.18,13.35) 后转向 -x �
 SEG5_DASH_Y = FINAL_JUMP_Y  # 保留旧变量名，避免其他代码引用时仍使用新终点
 FINAL_TURN_BUFFER = 0.15  # y- 方向快速前进有惯性，提前15cm停稳转向，避免中心点到边缘后才转
 FINAL_TURN_TRIGGER_Y = FINAL_JUMP_Y + FINAL_TURN_BUFFER
-FINAL_PRE_JUMP_FORWARD_DIST = 0.05  # 最后转向到 -x 后先向前走5cm，再触发跳跃
+FINAL_PRE_JUMP_FORWARD_DIST = 0.10  # 最后转向到 -x 后先向前走10cm，再触发跳跃
 SEG5_JUMP_DONE_Z = 0.05  # 起跳前桥面 z≈0.10，低于0.05认为已经跳下完成
 JUMP_FORWARD_DIST = 0.65  # 从10cm台面向前跳到地面的目标位移，原30cm，现增加到65cm
 STEP_UP_GAIT = 48  # usergait.toml真实下标：原注释#51，上台阶动作
+STEP_UP_LEFT_GAIT = 54  # 上台阶高抬脚+左纠偏，不降低抬脚高度
+STEP_UP_RIGHT_GAIT = 55  # 上台阶高抬脚+右纠偏，不降低抬脚高度
 JUMP_CROUCH_GAIT = 41  # usergait.toml真实下标：原注释#50，跳跃蓄力
 JUMP_TAKEOFF_GAIT = 49  # usergait.toml真实下标：原注释#52，起跳
 JUMP_LAND_GAIT = 50  # usergait.toml真实下标：原注释#53，落地缓冲
+POST_JUMP_RECOVER_GAIT = 56  # 跳跃后退出 mode=16 的长时间恢复站立，duration>6000ms
 JUMP_CROUCH_FRAMES = 2  # 约0.3s蓄力
 JUMP_TAKEOFF_FRAMES = 3  # 约0.5s起跳
 JUMP_LAND_FRAMES = 2  # 约0.3s落地缓冲
@@ -60,7 +64,7 @@ JUMP_TAKEOFF_SEC = 1.45  # 原地跳远 duration 需要大于790ms，增加保�
 JUMP_LAND_SEC = 0.20  # 跳跃触发后短暂站稳，后续进入恢复判断
 MAX_JUMP_SEC = 1.6
 MAX_JUMP_FRAMES = 14
-RECOVER_STAND_FRAMES = 5
+RECOVER_STAND_FRAMES = 2  # 主循环对 step=0 会等待约4秒，2帧已能保证落地后有足够站稳时间并尽快进入第六段
 FINAL_PRE_TURN_STAND_FRAMES = 2
 
 # 台阶位置
@@ -230,6 +234,9 @@ def segment5_control(position, gait_mode, rpy):
 
     # 跳下后如果处于倒下状态，先发站立，稳定若干帧后结束第五段。
     if _state == _ST_RECOVER:
+        if mode == 16:
+            _stand_count = 0
+            return POST_JUMP_RECOVER_GAIT
         if mode == 7:
             _stand_count = 0
             return 0
@@ -237,6 +244,18 @@ def segment5_control(position, gait_mode, rpy):
         if _stand_count >= RECOVER_STAND_FRAMES:
             _state = _ST_DONE
             return -1
+        return 0
+
+    # 跳跃动作是 mode=16 的一次性触发动作。若底层已经进入 mode=16，
+    # 上层必须接管到跳跃收尾，不能继续下发转向/行走，否则 segment5 无法返回 -1 进入 segment6。
+    if mode == 16 and _state not in (_ST_SEG5_JUMP, _ST_RECOVER, _ST_DONE):
+        _state = _ST_SEG5_JUMP
+        if _jump_start_x is None:
+            _jump_start_x = x
+        # 这里说明跳跃已被底层触发过，按接近起跳结束处理，避免重复发送跳跃指令。
+        if _jump_start_time is None:
+            _jump_start_time = time.monotonic() - JUMP_TAKEOFF_SEC
+        _jump_frames = 0
         return 0
 
     # 步态切换中等待 / 其他状态下检测到趴下则先站起
@@ -252,10 +271,13 @@ def segment5_control(position, gait_mode, rpy):
     # ── 接近台阶：y < 7.3 ────────────────────────────────────────
     if _state == _ST_SEG1_APPROACH:
         if y >= STEP_APPROACH_Y:
+            step = _turn_step(rpy, HDG_YP)
+            if step != 0:
+                return step
             _state = _ST_SEG1_STEP
             return STEP_UP_GAIT
         return _forward_with_lateral(
-            rpy, HDG_YP, CENTER_X_SEG1, x, 'x',
+            rpy, HDG_YP, CENTER_X_SEG1_START, x, 'x',
             gait_forward=32, gait_left=33, gait_right=34)
 
     # ── 翻越台阶：7.3 ≤ y < 8.5，先在 y=7.35 触发一次跳上动作，再保持高抬脚覆盖后脚 ───
@@ -266,11 +288,14 @@ def segment5_control(position, gait_mode, rpy):
             return step
         if y >= STEP_JUMP_Y:
             # 前脚接近5cm台阶边缘时执行一次跳上动作；后续继续用 #35 覆盖后脚。
+            step = _turn_step(rpy, HDG_YP)
+            if step != 0:
+                return step
             _state = _ST_SEG1_JUMP_UP
             return STEP_UP_GAIT
         return _forward_with_lateral(
-            rpy, HDG_YP, CENTER_X_SEG1, x, 'x',
-            gait_forward=STEP_UP_GAIT, gait_left=STEP_UP_GAIT, gait_right=STEP_UP_GAIT)
+            rpy, HDG_YP, CENTER_X_SEG1_START, x, 'x',
+            gait_forward=STEP_UP_GAIT, gait_left=STEP_UP_LEFT_GAIT, gait_right=STEP_UP_RIGHT_GAIT)
 
     # ── 跳上台阶后继续高抬脚：避免重复触发 #51，同时给后脚留通过距离 ─────
     elif _state == _ST_SEG1_JUMP_UP:
@@ -278,8 +303,8 @@ def segment5_control(position, gait_mode, rpy):
             step = _stand_then(_ST_SEG1_UPHILL, 3)
             return step
         return _forward_with_lateral(
-            rpy, HDG_YP, CENTER_X_SEG1, x, 'x',
-            gait_forward=STEP_UP_GAIT, gait_left=STEP_UP_GAIT, gait_right=STEP_UP_GAIT)
+            rpy, HDG_YP, CENTER_X_SEG1_START, x, 'x',
+            gait_forward=STEP_UP_GAIT, gait_left=STEP_UP_LEFT_GAIT, gait_right=STEP_UP_RIGHT_GAIT)
 
     # ── 继续上坡：8.5 ≤ y < TURN1_EARLY_Y，之后进入原有第五段完整路线 ────────────────────────────────
     # SEG1 保持原路线：到 TURN1_EARLY_Y 后进入原来的 45°+前进+45° 转弯流程。

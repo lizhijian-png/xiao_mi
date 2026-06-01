@@ -777,7 +777,7 @@ pos_des = [ 0.0, 0.0, 0.0,]
 acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
 ctrl_point = [ 0.0, 0.0, 0.0,]
 foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
-step_height = [ 0.26, 0.26,]
+step_height = [ 0.15, 0.15,]
 value = 0
 duration = 0
 
@@ -813,7 +813,7 @@ step_height = [ 0.0, 0.0,]
 value = 0
 duration = 300
 
-# 真实下标45 赛段6踢球专用 G_PUSH：低重心前进（重心降低0.08m，抬脚0.02，确保脚能接触到足球）
+# 真实下标51 赛段6踢球专用 G_PUSH：低重心前进（重心降低0.08m，抬脚0.02，确保脚能接触到足球）
 [[step]]
 mode = 11
 gait_id = 27
@@ -829,7 +829,7 @@ step_height = [ 0.02, 0.02,]
 value = 0
 duration = 0
 
-# 真实下标46 赛段6角落横移专用 G_SWEEP_L：低姿态左横移（仿#36 mode=11/gait_id=110自定义步态，pos_z-0.05压低机身+侧速+0.08左移，把球顶出角落）
+# 真实下标52 赛段6角落横移专用 G_SWEEP_L：低姿态左横移（仿#36 mode=11/gait_id=110自定义步态，pos_z-0.05压低机身+侧速+0.08左移，把球顶出角落）
 [[step]]
 mode = 11
 gait_id = 110
@@ -845,7 +845,7 @@ step_height = [ 30030.0, 30030.0,]
 value = 0
 duration = 270
 
-# 真实下标47 赛段6角落横移专用 G_SWEEP_R：低姿态右横移（mode=62低姿态高抬腿走，同下标5蹲姿机制，侧速-0.10退开拉间隙便于转身）
+# 真实下标53 赛段6角落横移专用 G_SWEEP_R：低姿态右横移（mode=62低姿态高抬腿走，同下标5蹲姿机制，侧速-0.10退开拉间隙便于转身）
 [[step]]
 mode = 62
 gait_id = 110
@@ -860,3 +860,53 @@ foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
 step_height = [ 0.0, 0.0,]
 value = 0
 duration = 0
+
+
+#54 segment5 step-up high-leg left correction: keep high step while correcting to centerline.
+[[step]]
+mode = 11
+gait_id = 27
+contact = 15
+life_count = 0
+vel_des = [ 0.24, 0.06, 0.0,]
+rpy_des = [ -0.08, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.0,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.15, 0.15,]
+value = 0
+duration = 0
+
+#55 segment5 step-up high-leg right correction: keep high step while correcting to centerline.
+[[step]]
+mode = 11
+gait_id = 27
+contact = 15
+life_count = 0
+vel_des = [ 0.24, -0.06, 0.0,]
+rpy_des = [ -0.08, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.0,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.15, 0.15,]
+value = 0
+duration = 0
+
+#56 跳跃后恢复站立：用于从 mode=16 跳跃动作明确切回 RECOVERY_STAND。
+# 官方接口中 RECOVERY_STAND 建议 duration>6000ms，这里单独使用 7000ms，避免普通转向/行走指令被 mode=16 吃掉。
+[[step]]
+mode = 12
+gait_id = 0
+contact = 0
+life_count = 0
+vel_des = [ 0.0, 0.0, 0.0,]
+rpy_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.0,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.0, 0.0,]
+value = 0
+duration = 7000

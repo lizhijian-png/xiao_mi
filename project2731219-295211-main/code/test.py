@@ -12,18 +12,22 @@ import threading
 import os
 import numpy as np
 import cv2
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 from Robot_Ctrl import Robot_Ctrl
 from Msg_receive import Pos_msg, Gait_msg
 from user_pub import user_pub
 from robot_control_cmd_lcmt import robot_control_cmd_lcmt
 from identify import arrow,yellow_wait,yellow_light
 from segment1 import segment1_control, reset_segment1
-from segment2 import segment2_control, reset_segment2
+from segment2_manual import segment2_manual_control, reset_segment2_manual, parse_preset_args
 from segment3 import segment3_control, reset_segment3
-from segment4 import segment4_control, reset_segment4, speech_ready
+from segment4 import segment4_control, reset_segment4
 from segment5 import segment5_control, reset_segment5
 from segment6 import segment6_control, reset_segment6
-from ball_camera import BallCamera
 flags ={
     "ENDING_FLAG1" : False,# 赛段1标志
     "ENDING_FLAG2" : False,# 赛段2标志
@@ -86,7 +90,7 @@ def select_step_based_on_position(position, gait_mode, rpy, frame=None):
 
         # 赛段2：荒野寻珠
         elif flags["ENDING_FLAG2"] == False:
-            step = segment2_control(position, gait_mode, rpy, frame=frame)
+            step = segment2_manual_control(position, gait_mode, rpy, frame=frame)
             if step == -1:
                 flags["ENDING_FLAG2"] = True
                 return walk_90(rpy)  # 进入第三赛段（S弯）
@@ -438,17 +442,34 @@ def pass_s_back(position,rpy):
         return walk_180(rpy)
 
 
-def main():
+###########################################################################################
+class CameraNode(Node):
+    def __init__(self):
+        super().__init__("test_camera")
+        self.bridge = CvBridge()
+        self.frame = None
+        qos = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1,
+        )
+        self.create_subscription(Image, "/rgb_camera/image_raw", self._cb, qos)
+
+    def _cb(self, msg):
+        self.frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+
+
+def main(preset):
     global turn_count
     turn_count = 0
     lcm_cmd = lcm.LCM("udpm://239.255.76.67:7671?ttl=255")
-    cmd_msg = robot_control_cmd_lcmt()    
+    cmd_msg = robot_control_cmd_lcmt()
     data_lock = threading.Lock()
-    
+
     try:
         user_pub()
         reset_segment1()
-        reset_segment2()
+        reset_segment2_manual(preset)
         reset_segment3()
         reset_segment4()
         reset_segment5()
@@ -460,8 +481,9 @@ def main():
         rec_thread = threading.Thread(target=pos_msg.run)
         gait_thread= threading.Thread(target=gait_msg.run)
 
-        # 按开发者手册固定使用真机 RGB 相机 /image_rgb，不接 AI 相机 /image。
-        cam_node = BallCamera().start()
+        rclpy.init(args=None)
+        cam_node = CameraNode()
+        ros_thread = threading.Thread(target=lambda: rclpy.spin(cam_node), daemon=True)
 
         ctrl_thread.start()
         time.sleep(4)
@@ -470,27 +492,16 @@ def main():
         time.sleep(0.5)
         rec_thread.start()
         gait_thread.start()
-        if not cam_node.wait_ready(15.0):
-            raise RuntimeError(f"RGB相机没有真实图像，拒绝启动比赛：{cam_node.diagnostics()}")
-        if not speech_ready():
-            raise RuntimeError("未找到第四赛段语音引擎；请安装 spd-say/espeak-ng，或设置 SEGMENT4_TTS")
-        print(f"相机就绪，图像话题={cam_node.active_topic()}，诊断={cam_node.diagnostics()}")
+        ros_thread.start()
         def print_worker():
             while True:
-                from segment2 import _state as seg2_state, _target_idx as seg2_row
+                from segment2_manual import _state as seg2_state, _target_idx as seg2_row
                 from segment5 import _state as seg5_state
-                import segment6 as seg6
+                from segment6 import _state as seg6_state
                 if flags["ENDING_FLAG5"] == False and flags["ENDING_FLAG4"] == True:
                     active_state = f"seg5={seg5_state}"
                 elif flags["ENDING_FLAG6"] == False and flags["ENDING_FLAG5"] == True:
-                    frame = cam_node.frame()
-                    found, offset, radius = seg6.find_ball(frame)
-                    diag = cam_node.diagnostics()
-                    active_state = (f"seg6={seg6._state} camera={diag['active_topic']} "
-                                    f"frames={diag['frame_count']} age={diag['frame_age']} "
-                                    f"ball={'Y' if found else 'N'} u={offset:+.0f} "
-                                    f"r={radius:.0f} lost={seg6._lost_count} "
-                                    f"cam_error={diag['error']}")
+                    active_state = f"seg6={seg6_state}"
                 else:
                     active_state = f"seg2={seg2_state}/row{seg2_row}"
                 print(f"当前位置: {pos_msg.position} 机身朝向{pos_msg.rpy[2]} 箭头识别结果{results['ARROW']} 选择:{my_ctrl.num} {active_state}")
@@ -502,18 +513,14 @@ def main():
         while True:
             # time.sleep(0.2)
             with data_lock:
-                num = select_step_based_on_position(pos_msg.position, gait_msg.gait_mode, pos_msg.rpy[2], cam_node.frame())
+                num = select_step_based_on_position(pos_msg.position, gait_msg.gait_mode, pos_msg.rpy[2], cam_node.frame)
+                # print(f"当前位置: {pos_msg.position} 机身朝向{pos_msg.rpy[2]} 箭头识别结果{results['ARROW']} 选择:{num}")
+                # print(f"{gait_msg.gait_mode}")
             my_ctrl.num = num
             my_ctrl.msg.life_count =(my_ctrl.msg.life_count + 1) % 127
-            if flags["ENDING_FLAG3"] and not flags["ENDING_FLAG4"]:
-                # 第四赛段视觉/限高状态机需要约5Hz连续更新；站立0只是一拍状态交接。
-                time.sleep(0.2)
-            elif num == 0 and flags["ENDING_FLAG5"] == False:
+            if num==0:
                 print("站立")
-                time.sleep(4)
-            elif flags["ENDING_FLAG5"] == True:
-                # 第六赛段视觉闭环保持约5Hz；包括返回站立指令的帧。
-                time.sleep(0.2)
+                time.sleep(4)           
 
     except KeyboardInterrupt:
         cmd_msg.mode = 7  # PureDamper before KeyboardInterrupt
@@ -522,11 +529,12 @@ def main():
         cmd_msg.life_count += 1
         lcm_cmd.publish("robot_control_cmd", cmd_msg.encode())
         pass
-    finally:
-        if 'cam_node' in locals():
-            cam_node.stop()
     sys.exit()
 
 
 if __name__ == '__main__':
-    main()
+    # 命令行参数：R4/R3/R2 行橙球所在列（1~4，对应 C1~C4），R1 由排除法推出
+    # 用法示例：python test.py 1 2 3
+    preset = parse_preset_args(sys.argv[1:])
+    print(f"[总编排器] 赛段2 预设橙球位置: {preset}")
+    main(preset)

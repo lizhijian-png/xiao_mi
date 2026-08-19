@@ -248,10 +248,12 @@
         <kp  value="50000.0"/>
         <kd  value="5000.0"/>
     </gazebo>
-    <gazebo reference="RGB_camera_link">
+    <!-- 该简化模型只有 body，没有 RGB_camera_link；前视相机直接挂 body。 -->
+    <gazebo reference="body">
         <sensor type="camera" name="rgb camera">
             <always_on>true</always_on>
             <update_rate>15.0</update_rate>
+            <pose>0.28 0 0.13 0 0.28 0</pose>
             <camera name="rgb_camera">
                 <horizontal_fov>1.46608</horizontal_fov>
                 <image>
@@ -277,7 +279,7 @@
                 <!-- Set camera name. If empty, defaults to sensor name (i.e. "sensor_name") -->
                 <camera_name>rgb_camera</camera_name>
                 <!-- Set TF frame name. If empty, defaults to link name (i.e. "link_name") -->
-                <frame_name>RGB_camera_link</frame_name>
+                <frame_name>body</frame_name>
                 <hack_baseline>0.2</hack_baseline>
             </plugin>
         </sensor>

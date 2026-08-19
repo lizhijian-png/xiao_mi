@@ -25,6 +25,8 @@
   顶得太远暂时看不到时仍沿328°接近，球进入视野后立即按横向偏移修正，不原地摆扫。
 """
 
+from speed_profile import RACE_MODE, G_STAND_SHORT
+
 # ── 场地几何（绝对坐标，米）──
 LEFT_WALL_X, RIGHT_WALL_X = 0.0, 2.8     # 黄线内侧实际边界（原 -0.10/2.90）
 BOT_WALL_Y,  TOP_WALL_Y   = 12.7, 15.0   # 黄线内侧实际边界（原 12.60/15.10）
@@ -91,6 +93,7 @@ GAP_BIAS_W = 0.35     # 缺口方向权重(0=只追球, 1=只对缺口)，现场
 GAP_ENTRY_X, GAP_ENTRY_Y = 2.80, 12.90   # 缺口中心(x=2.80, y∈[12.7,13.10])
 
 LOST_MAX_FRAMES = 8   # 最近目标朝向最多保留的漏检帧数（不代表允许持续前推）
+NAV_SLOWDOWN_DIST = 0.35  # 墙边/终点最后35cm恢复普通前进，留足刹停余量
 
 # ── 踢球退路开关（倒顶若仿真失败，置 True 切踢射方案）──
 USE_KICK_FALLBACK = False
@@ -307,7 +310,7 @@ def segment6_control(position, gait_mode, rpy, frame=None):
     if _state not in (_ST_H_LAYDOWN, _ST_DONE) and (
         (gait == 0 and mode == 0) or (gait == 1 and mode == 9) or mode == 7
     ):
-        return G_STAND
+        return G_STAND_SHORT
 
     # 视觉取球：仅 E/F/G 追球段需要，A~D2 顶球段走固定路线不调用（省算力也避免误检干扰）。
     # frame is None 表示压根没相机/没收到帧，和「有帧但没找到球」是两回事：
@@ -327,15 +330,17 @@ def segment6_control(position, gait_mode, rpy, frame=None):
     if _state == _ST_A_GO_TOP:
         if y >= TOP_Y:
             _state = _ST_B_GO_CORNER
-            return G_STAND
-        return _walk(rpy, HDG_UP, G_NAV)
+            return G_STAND_SHORT
+        nav_gait = G_KICK if RACE_MODE and (TOP_Y - y) > NAV_SLOWDOWN_DIST else G_NAV
+        return _walk(rpy, HDG_UP, nav_gait)
 
     # ── B：转180°贴顶墙左行到左上角（左墙挡停，两墙自定位）──
     elif _state == _ST_B_GO_CORNER:
         if x <= CORNER_X:
             _state = _ST_C_AIM_SWEEP
-            return G_STAND
-        return _walk(rpy, HDG_LEFT, G_NAV)
+            return G_STAND_SHORT
+        nav_gait = G_KICK if RACE_MODE and (x - CORNER_X) > NAV_SLOWDOWN_DIST else G_NAV
+        return _walk(rpy, HDG_LEFT, nav_gait)
 
     # ── C：原地转头到225°（左侧身体朝右下对球）──
     elif _state == _ST_C_AIM_SWEEP:
@@ -441,11 +446,13 @@ def segment6_control(position, gait_mode, rpy, frame=None):
 
     # ── NAV_FINISH：足球已经越过出口；机器狗自身精确进入终点圆心 ──
     elif _state == _ST_NAV_FINISH:
+        finish_dist = _dist(x, y, FINISH_CX, FINISH_CY)
         if (abs(x - FINISH_CX) <= FINISH_XY_TOL and
                 abs(y - FINISH_CY) <= FINISH_XY_TOL):
             _state = _ST_TURN_FINISH
-            return G_STAND
-        return _walk(rpy, _hdg_to(x, y, FINISH_CX, FINISH_CY), G_NAV)
+            return G_STAND_SHORT
+        nav_gait = G_KICK if RACE_MODE and finish_dist > 0.30 else G_NAV
+        return _walk(rpy, _hdg_to(x, y, FINISH_CX, FINISH_CY), nav_gait)
 
     # ── TURN_FINISH：圈内原地转身，头从328°转到正对+x(0°)，对准后进趴下 ──
     elif _state == _ST_TURN_FINISH:
@@ -524,3 +531,8 @@ def _kick_fallback_control(x, y, rpy):
         return -1
 
     return G_STAND
+
+
+if __name__ == "__main__":
+    from test6 import main as _run_standalone_test
+    _run_standalone_test()

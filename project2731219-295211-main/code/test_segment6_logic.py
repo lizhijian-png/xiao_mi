@@ -75,9 +75,9 @@ def test_A_go_top_then_B_at_top_wall():
     s6.reset_segment6()
     step, st = _drive((2.5, 13.5), s6.HDG_UP)
     assert st == s6._ST_A_GO_TOP
-    assert step in (s6.G_NAV, s6.G_TURN_L, s6.G_TURN_R, s6.G_FTURN_L, s6.G_FTURN_R)
+    assert step in (s6.G_NAV, s6.G_KICK, s6.G_TURN_L, s6.G_TURN_R, s6.G_FTURN_L, s6.G_FTURN_R)
     step, st = _drive((2.5, s6.TOP_Y + 0.01), s6.HDG_UP)
-    assert st == s6._ST_B_GO_CORNER and step == s6.G_STAND
+    assert st == s6._ST_B_GO_CORNER and step == s6.G_STAND_SHORT
 
 
 def test_B_go_corner_then_C_at_corner():
@@ -86,9 +86,9 @@ def test_B_go_corner_then_C_at_corner():
     step, st = _drive((2.0, 14.95), 90)
     assert step == s6._turn_step(90, s6.HDG_LEFT) and st == s6._ST_B_GO_CORNER
     step, st = _drive((2.0, 14.95), s6.HDG_LEFT)
-    assert step == s6.G_NAV and st == s6._ST_B_GO_CORNER
+    assert step == s6.G_KICK and st == s6._ST_B_GO_CORNER
     step, st = _drive((s6.CORNER_X - 0.01, 14.95), s6.HDG_LEFT)
-    assert st == s6._ST_C_AIM_SWEEP and step == s6.G_STAND
+    assert st == s6._ST_C_AIM_SWEEP and step == s6.G_STAND_SHORT
 
 
 def test_C_aim_sweep_turns_to_225_then_D():
@@ -177,7 +177,7 @@ def test_nav_finish_requires_both_xy_then_turns():
     assert st == s6._ST_NAV_FINISH and step != s6.G_STAND
     # x/y都到圆心容差内，才允许进入转身趴下阶段
     step, st = _drive((s6.FINISH_CX, s6.FINISH_CY), s6.HDG_FINISH)
-    assert st == s6._ST_TURN_FINISH and step == s6.G_STAND
+    assert st == s6._ST_TURN_FINISH and step == s6.G_STAND_SHORT
 
 
 def test_turn_finish_turns_to_plus_x_then_laydown_then_done():
@@ -407,7 +407,17 @@ def test_A_to_D2_unaffected_by_vision(monkeypatch):
     _stub_ball(monkeypatch, True, u=+9999)
     s6.reset_segment6()
     step, st = _drive((2.5, 13.5), s6.HDG_UP, frame=_FakeFrame())
-    assert st == s6._ST_A_GO_TOP and step == s6.G_NAV
+    assert st == s6._ST_A_GO_TOP and step == s6.G_KICK
+
+
+def test_navigation_slows_down_near_wall_and_finish():
+    s6.reset_segment6()
+    step, _ = _drive((2.5, s6.TOP_Y - 0.20), s6.HDG_UP)
+    assert step == s6.G_NAV
+
+    s6._state = s6._ST_NAV_FINISH
+    step, _ = _drive((s6.FINISH_CX - 0.20, s6.FINISH_CY), s6.HDG_FINISH)
+    assert step == s6.G_NAV
 
 
 def test_ball_detection_requires_consecutive_frames():

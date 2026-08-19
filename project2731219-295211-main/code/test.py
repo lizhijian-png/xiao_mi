@@ -23,7 +23,7 @@ from user_pub import user_pub
 from robot_control_cmd_lcmt import robot_control_cmd_lcmt
 from identify import arrow,yellow_wait,yellow_light
 from segment1 import segment1_control, reset_segment1
-from segment2 import segment2_control, reset_segment2
+from segment2_manual import segment2_manual_control, reset_segment2_manual, parse_preset_args
 from segment3 import segment3_control, reset_segment3
 from segment4 import segment4_control, reset_segment4
 from segment5 import segment5_control, reset_segment5
@@ -90,7 +90,7 @@ def select_step_based_on_position(position, gait_mode, rpy, frame=None):
 
         # 赛段2：荒野寻珠
         elif flags["ENDING_FLAG2"] == False:
-            step = segment2_control(position, gait_mode, rpy, frame=frame)
+            step = segment2_manual_control(position, gait_mode, rpy, frame=frame)
             if step == -1:
                 flags["ENDING_FLAG2"] = True
                 return walk_90(rpy)  # 进入第三赛段（S弯）
@@ -459,17 +459,17 @@ class CameraNode(Node):
         self.frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
 
 
-def main():
+def main(preset):
     global turn_count
     turn_count = 0
     lcm_cmd = lcm.LCM("udpm://239.255.76.67:7671?ttl=255")
-    cmd_msg = robot_control_cmd_lcmt()    
+    cmd_msg = robot_control_cmd_lcmt()
     data_lock = threading.Lock()
-    
+
     try:
         user_pub()
         reset_segment1()
-        reset_segment2()
+        reset_segment2_manual(preset)
         reset_segment3()
         reset_segment4()
         reset_segment5()
@@ -495,7 +495,7 @@ def main():
         ros_thread.start()
         def print_worker():
             while True:
-                from segment2 import _state as seg2_state, _target_idx as seg2_row
+                from segment2_manual import _state as seg2_state, _target_idx as seg2_row
                 from segment5 import _state as seg5_state
                 from segment6 import _state as seg6_state
                 if flags["ENDING_FLAG5"] == False and flags["ENDING_FLAG4"] == True:
@@ -533,4 +533,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # 命令行参数：R4/R3/R2 行橙球所在列（1~4，对应 C1~C4），R1 由排除法推出
+    # 用法示例：python test.py 1 2 3
+    preset = parse_preset_args(sys.argv[1:])
+    print(f"[总编排器] 赛段2 预设橙球位置: {preset}")
+    main(preset)

@@ -5,9 +5,9 @@
   分段1：y+ (90°)  中心线 x=3.15    起点(3.15, 7.0)  → 终点(3.15, 12.35)  长5.35m
       ├─ 台阶在 y≈7.6
   分段2：x- (180°) 中心线 y=12.35   起点(3.15, 12.35) → 终点(-0.35, 12.35) 长3.5m
-  分段3：y+ (90°)  中心线 x=-0.35   起点(-0.35, 12.35) → 终点(-0.35, 15.35) 长3.0m
-  分段4：x+ (0°)   中心线 y=15.35   起点(-0.35, 15.35) → 终点(3.15, 15.35)  长3.5m
-  分段5：y- (270°) 中心线 x=3.15    起点(3.15, 15.35) → 平整1.2m+跳下0.8m  长2.0m
+  分段3：y+ (90°)  中心线 x=-0.35   起点(-0.35, 12.35) → 终点(-0.35, 15.40) 长3.05m
+  分段4：x+ (0°)   中心线 y=15.40   起点(-0.35, 15.40) → 终点(3.15, 15.40)  长3.5m
+  分段5：y- (270°) 中心线 x=3.15    起点(3.15, 15.40) → 平整1.2m+跳下0.8m  长2.0m
 
 usergait.toml 步态索引：
   共享（赛段1-4不变）：
@@ -33,20 +33,20 @@ CENTER_X_SEG1 = 3.15    # y=9.00 后恢复的分段1中心线 x
 CENTER_X_SEG5 = 3.10    # 第五段最后一段 y- 行进基准线，起跳前远离 x- 台边，减少后脚挂边
 CENTER_Y_SEG2 = 12.35   # 分段2 中心线 y
 CENTER_X_SEG3 = -0.35   # 分段3 中心线 x
-CENTER_Y_SEG4 = 15.35   # 分段4 中心线 y
+CENTER_Y_SEG4 = 15.40   # 分段4 中心线 y
 
 # 连接点（转弯触发位置）
 TURN1_Y = 12.35   # SEG1→SEG2: 到达 y≥12.35 触发左转
 TURN1_EARLY_Y = 12.05  # SEG1→SEG2: 在y=12.05先转45°，兼顾提前离边和不过早偏离中心线
 TURN1_FORWARD_DIST = 0.20  # SEG1→SEG2: 第一次45°转完后再实际前进约0.2m，再进入第二次45°转向
 TURN2_X = -0.35   # SEG2→SEG3: 到达 x≤-0.35 触发右转
-TURN3_Y = 15.35   # SEG3→SEG4: 到达 y≥15.35 触发右转
+TURN3_Y = 15.40   # SEG3→SEG4: 到达 y≥15.40 触发右转
 TURN4_X = 3.15    # SEG4→SEG5: 到达 x≥3.15 触发右转
 FINAL_JUMP_Y = 13.35  # 最后一段沿 y- 走到约 (3.18,13.35) 后转向 -x 并立即起跳，预留跳下距离0.8m
 SEG5_DASH_Y = FINAL_JUMP_Y  # 保留旧变量名，避免其他代码引用时仍使用新终点
 FINAL_TURN_BUFFER = 0.15  # y- 方向快速前进有惯性，提前15cm停稳转向，避免中心点到边缘后才转
 FINAL_TURN_TRIGGER_Y = FINAL_JUMP_Y + FINAL_TURN_BUFFER
-FINAL_PRE_JUMP_FORWARD_DIST = 0.10  # 最后转向到 -x 后先向前走10cm，再触发跳跃
+# FINAL_PRE_JUMP_FORWARD_DIST = 0.10  # 已移除：转向后直接起跳，不再前进10cm
 SEG5_JUMP_DONE_Z = 0.05  # 起跳前桥面 z≈0.10，低于0.05认为已经跳下完成
 JUMP_FORWARD_DIST = 0.65  # 从10cm台面向前跳到地面的目标位移，原30cm，现增加到65cm
 STEP_UP_GAIT = 48  # usergait.toml真实下标：原注释#51，上台阶动作
@@ -116,7 +116,6 @@ _ST_TURN4         = "TURN4"
 _ST_SEG5_FLAT     = "SEG5_FLAT"
 _ST_SEG5_PRE_TURN_XN = "SEG5_PRE_TURN_XN"
 _ST_SEG5_TURN_XN  = "SEG5_TURN_XN"
-_ST_SEG5_PRE_JUMP_FORWARD = "SEG5_PRE_JUMP_FORWARD"
 _ST_SEG5_JUMP     = "SEG5_JUMP"
 _ST_DONE          = "DONE"
 
@@ -124,18 +123,16 @@ _state = _ST_SEG1_APPROACH
 _stand_count = 0  # 站立帧计数（复用：台阶后稳定、转弯前稳定）
 _turn1_forward_start = None  # 第一交接处第一次45°转完后的起走位置，用于计算实际前进距离
 _jump_start_x = None
-_pre_jump_forward_start = None
 _jump_frames = 0
 _jump_start_time = None
 
 
 def reset_segment5():
-    global _state, _stand_count, _turn1_forward_start, _jump_start_x, _pre_jump_forward_start, _jump_frames, _jump_start_time
+    global _state, _stand_count, _turn1_forward_start, _jump_start_x, _jump_frames, _jump_start_time
     _state = _ST_SEG1_APPROACH
     _stand_count = 0
     _turn1_forward_start = None
     _jump_start_x = None
-    _pre_jump_forward_start = None
     _jump_frames = 0
     _jump_start_time = None
 
@@ -227,7 +224,7 @@ def segment5_control(position, gait_mode, rpy):
     Returns:
         int: 步态索引；-1 表示赛段5完成
     """
-    global _state, _stand_count, _turn1_forward_start, _jump_start_x, _pre_jump_forward_start, _jump_frames, _jump_start_time
+    global _state, _stand_count, _turn1_forward_start, _jump_start_x, _jump_frames, _jump_start_time
 
     x, y, z = position
     gait, mode = gait_mode
@@ -469,7 +466,7 @@ def segment5_control(position, gait_mode, rpy):
     elif _state == _ST_SEG5_PRE_TURN_XN:
         return _stand_then(_ST_SEG5_TURN_XN, FINAL_PRE_TURN_STAND_FRAMES)
 
-    # ── 转向 -x：转正后立即执行 #50 跳跃动作，不留前进助跑空间 ─────
+    # ── 转向 -x：转正后立即起跳，不再前进助跑 ─────
     elif _state == _ST_SEG5_TURN_XN:
         d = _norm(rpy - HDG_XN)
         if d > FAST_DEG:
@@ -480,27 +477,13 @@ def segment5_control(position, gait_mode, rpy):
             return 14
         if d < -FINAL_JUMP_ALIGN_DEG:
             return 2
-        # 最后一次起跳前单独收紧朝向误差，避免 8 度容差下斜着起跳或提前进入恢复。
-        _state = _ST_SEG5_PRE_JUMP_FORWARD
-        _pre_jump_forward_start = (x, y)
-        return 0
+        # 转向对齐后直接进入跳跃状态
+        _state = _ST_SEG5_JUMP
+        _jump_start_x = x
+        _jump_frames = 0
+        _jump_start_time = time.monotonic()
+        return JUMP_TAKEOFF_GAIT
 
-    # 跳跃前短距离前进：转正后沿 -x 先走5cm，再触发跳跃。
-    elif _state == _ST_SEG5_PRE_JUMP_FORWARD:
-        if _pre_jump_forward_start is None:
-            _pre_jump_forward_start = (x, y)
-        dx = x - _pre_jump_forward_start[0]
-        dy = y - _pre_jump_forward_start[1]
-        if math.sqrt(dx * dx + dy * dy) >= FINAL_PRE_JUMP_FORWARD_DIST:
-            _state = _ST_SEG5_JUMP
-            _jump_start_x = x
-            _jump_frames = 0
-            _jump_start_time = time.monotonic()
-            return JUMP_TAKEOFF_GAIT
-        return _forward_with_lateral(
-            rpy, HDG_XN, _pre_jump_forward_start[1], y, 'y',
-            gait_forward=31, gait_left=37, gait_right=38,
-            tolerance=SEG5_LAT_TOLERANCE)
     # ── 朝 -x 立即跳跃：根据 z 下降判断是否离开 z≈10cm 的桥面 ─────────
     elif _state == _ST_SEG5_JUMP:
         if _jump_start_time is None:

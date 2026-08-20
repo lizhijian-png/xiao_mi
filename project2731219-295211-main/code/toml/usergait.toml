@@ -773,7 +773,7 @@ contact = 15
 life_count = 0
 vel_des = [ 0.26, 0.0, 0.0,]
 rpy_des = [ -0.08, 0.0, 0.0,]
-pos_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.03,]
 acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
 ctrl_point = [ 0.0, 0.0, 0.0,]
 foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
@@ -870,7 +870,7 @@ contact = 15
 life_count = 0
 vel_des = [ 0.24, 0.06, 0.0,]
 rpy_des = [ -0.08, 0.0, 0.0,]
-pos_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.03,]
 acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
 ctrl_point = [ 0.0, 0.0, 0.0,]
 foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
@@ -886,7 +886,7 @@ contact = 15
 life_count = 0
 vel_des = [ 0.24, -0.06, 0.0,]
 rpy_des = [ -0.08, 0.0, 0.0,]
-pos_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.03,]
 acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
 ctrl_point = [ 0.0, 0.0, 0.0,]
 foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
@@ -910,3 +910,70 @@ foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
 step_height = [ 0.0, 0.0,]
 value = 0
 duration = 7000
+
+#57 赛段4悬挂小球专用：跳跃撞球（mode=16 官方原地跳远触发动作，项目已验证）
+# 悬挂小球底部离地 60cm。mode=22 FORCE_JUMP 的 acc_des 字段当前固件未开放（developer_guide.md 标注"当前暂不开放"），
+# 设置 acc_des 无效（实测只蹲起不离地），故改用 mode=16（同 #49 第五段跳下起跳，已验证）。
+# 注意：mode=16 是往前跳远（约 65cm），非原地跳高；跳跃高度与撞球位置需现场标定。
+[[step]]
+mode = 16
+gait_id = 1
+contact = 0
+life_count = 0
+vel_des = [ 0.0, 0.0, 0.0,]
+rpy_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.0,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.0, 0.0,]
+value = 0
+duration = 1400
+
+#58 跳跃测试：mode=16 gait_id=0（排查跳法，安全值）
+[[step]]
+mode = 16
+gait_id = 0
+contact = 0
+life_count = 0
+vel_des = [ 0.0, 0.0, 0.0,]
+rpy_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.0,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.0, 0.0,]
+value = 0
+duration = 1400
+
+#59 跳跃测试：mode=16 gait_id=2（排查跳法，安全值）
+[[step]]
+mode = 16
+gait_id = 2
+contact = 0
+life_count = 0
+vel_des = [ 0.0, 0.0, 0.0,]
+rpy_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.0,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.0, 0.0,]
+value = 0
+duration = 1400
+
+#60 跳跃测试：mode=16 gait_id=3（排查跳法，安全值）
+[[step]]
+mode = 16
+gait_id = 3
+contact = 0
+life_count = 0
+vel_des = [ 0.0, 0.0, 0.0,]
+rpy_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.0,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.0, 0.0,]
+value = 0
+duration = 1400

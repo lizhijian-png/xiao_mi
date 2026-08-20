@@ -94,6 +94,7 @@ BACKUP_DIST = {
     "football": 0.13,
     "orange": 0.20,
 }
+FOOTBALL_BACKUP_AFTER_KICK_DIST = 0.13
 TARGET_NAME_CN = {
     "cola": "可乐瓶",
     "football": "足球",
@@ -881,6 +882,7 @@ def _route_opening_lane(position, rpy, frame):
                           "opening_turn_north_done", position)
 
     if _state == S["OPENING_ALIGN_UP"]:
+        _announce_once(f"{_current_lane}_no_cross_in", "无法跨越障碍")
         return _adjust_x(position, rpy, lane_x, HEADING_NORTH,
                         S["OPENING_ADVANCE"], "opening_align_up_done")
 
@@ -924,6 +926,7 @@ def _route_opening_lane(position, rpy, frame):
     if _state == S["OPENING_RETURN"]:
         # 向南返回到小口高度
         if y <= OPENING_Y + XY_TOL:
+            _announce_once(f"{_current_lane}_no_cross_out", "无法跨越障碍")
             _set_state(S["OPENING_CROSS_OUT"], "opening_return_to_y", position)
             return _return_step(0, "opening_return_to_y", position, rpy)
         step = _forward_lane_step(position, rpy, HEADING_SOUTH, lane_x)

@@ -977,3 +977,51 @@ foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
 step_height = [ 0.0, 0.0,]
 value = 0
 duration = 1400
+
+#61 赛段1倒退版专用：倒退高抬腿（vel=[-0.15,0,0], step_h=0.12，可跨越5cm石板；配合机身转向180°后使用，实际世界坐标沿+x前进）
+[[step]]
+mode = 11
+gait_id = 27
+contact = 15
+life_count = 0
+vel_des = [ -0.15, 0.0, 0.0,]
+rpy_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.0,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.12, 0.12,]
+value = 0
+duration = 0
+
+#62 赛段1倒退版专用：倒退高抬腿+左纠偏（body-frame +y修正，用于机身yaw=180°时对抗世界-y漂移）
+[[step]]
+mode = 11
+gait_id = 27
+contact = 15
+life_count = 0
+vel_des = [ -0.15, 0.05, 0.0,]
+rpy_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.0,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.12, 0.12,]
+value = 0
+duration = 0
+
+#63 赛段1倒退版专用：倒退高抬腿+右纠偏（body-frame -y修正，用于机身yaw=180°时对抗世界+y漂移）
+[[step]]
+mode = 11
+gait_id = 27
+contact = 15
+life_count = 0
+vel_des = [ -0.15, -0.05, 0.0,]
+rpy_des = [ 0.0, 0.0, 0.0,]
+pos_des = [ 0.0, 0.0, 0.0,]
+acc_des = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+ctrl_point = [ 0.0, 0.0, 0.0,]
+foot_pose = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,]
+step_height = [ 0.12, 0.12,]
+value = 0
+duration = 0
